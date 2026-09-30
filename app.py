@@ -114,7 +114,6 @@ def comprimir_imagen(imagen_subida, max_ancho=600, calidad=65):
     buffer = BytesIO()
     img.save(buffer, format="JPEG", quality=calidad, optimize=True)
     
-    # Control de seguridad: si supera los 80 KB, reduce más la calidad
     if buffer.getbuffer().nbytes > 80 * 1024:
         buffer = BytesIO()
         img.save(buffer, format="JPEG", quality=50, optimize=True)
@@ -173,7 +172,6 @@ if menu == "Inventario Actual":
 
     df_productos = pd.read_sql(query, engine)
 
-    # Limpieza de datos por seguridad
     if "foto_url" in df_productos.columns:
         df_productos["foto_url"] = df_productos["foto_url"].fillna("").astype(str)
         df_productos.loc[df_productos["foto_url"].isin(["0", "None", "nan", "NaN", "null"]), "foto_url"] = ""
@@ -196,6 +194,9 @@ if menu == "Inventario Actual":
             with st.container(border=True):
                 col_info1, col_info2, col_info3, col_info4, col_img = st.columns([2.5, 1.8, 1.5, 1.5, 1.2])
                 
+                stock_unidades = float(row['stock'])
+                stock_docenas = stock_unidades / 12.0
+
                 with col_info1:
                     st.markdown(f"<div class='product-title'>{row['nombre']}</div>", unsafe_allow_html=True)
                     st.markdown(f"<div class='product-info'>Código: <b>{row['codigo_interno']}</b></div>", unsafe_allow_html=True)
@@ -207,7 +208,7 @@ if menu == "Inventario Actual":
                     st.markdown(f"<div class='product-info'>Origen: <b>{origen_badge}</b></div>", unsafe_allow_html=True)
 
                 with col_info3:
-                    st.markdown(f"<div class='product-info'>Stock: <b>{row['stock']} doc.</b></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='product-info'>Stock: <b>{stock_docenas:.2f} doc.</b><br><span style='font-size:11px;'>({stock_unidades:.0f} unidades)</span></div>", unsafe_allow_html=True)
 
                 with col_info4:
                     st.markdown(f"<div class='product-price'>S/ {row['precio_venta']:.2f}</div>", unsafe_allow_html=True)
@@ -244,7 +245,15 @@ elif menu == "Registrar Producto":
             origen = st.selectbox("Origen del Producto", ["Nacional", "Internacional"])
         with col2:
             talla = st.text_input("Talla (Ej: 36, 37, 38 o Rango 36-39)")
-            stock = st.number_input("Stock Inicial (en Docenas)", min_value=0.0, format="%.2f", help="Ingrese la cantidad en docenas (ej: 1 = una docena, 0.5 = media docena)")
+            
+            # Campos independientes para Docenas o Unidades
+            st.markdown("<b>📦 Stock Inicial (Llena docenas o unidades, el otro se autocompleta):</b>", unsafe_allow_html=True)
+            col_d, col_u = st.columns(2)
+            with col_d:
+                input_docenas = st.number_input("Docenas", min_value=0.0, value=1.0, format="%.2f")
+            with col_u:
+                input_unidades = st.number_input("Unidades sueltas", min_value=0.0, value=0.0, format="%.2f")
+
             precio_venta = st.number_input("Precio de Venta por Docena (S/)", min_value=0.0, format="%.2f")
             precio_compra = st.number_input("Precio de Compra / Costo por Docena (S/)", min_value=0.0, format="%.2f")
             
@@ -255,6 +264,14 @@ elif menu == "Registrar Producto":
 
         if submit:
             if codigo and nombre:
+                # Lógica automática: si modificó las unidades y las docenas están en su valor por defecto de 1.0 pero quiso poner otra cantidad, 
+                # determinamos cuál llenó el usuario.
+                # Calculamos el stock total en unidades base:
+                if input_unidades > 0 and input_docenas == 1.0:
+                    stock_total_unidades = input_unidades
+                else:
+                    stock_total_unidades = (input_docenas * 12.0) + input_unidades
+
                 foto_url = ""
                 if foto_subida is not None:
                     with st.spinner("Subiendo foto..."):
@@ -276,14 +293,14 @@ elif menu == "Registrar Producto":
                                 categoria=categoria,
                                 origen=origen,
                                 talla=talla,
-                                stock=stock,
+                                stock=float(stock_total_unidades),
                                 precio_venta=precio_venta,
                                 precio_compra=precio_compra,
                                 foto_url=foto_url,
                                 apuntes=apuntes,
                             ),
                         )
-                    st.success(f"¡Sandalia '{nombre}' registrada con éxito!")
+                    st.success(f"¡Sandalia '{nombre}' registrada con éxito! (Stock equivalente: {stock_total_unidades} unidades)")
                 except Exception as e:
                     st.error(f"Error al registrar (el código ya podría existir): {e}")
             else:
@@ -310,10 +327,11 @@ elif menu == "Registrar Venta (POS)":
         if "carrito_chanclas" not in st.session_state:
             st.session_state.carrito_chanclas = []
 
+        df_productos["stock_doc"] = df_productos["stock"] / 12.0
         df_productos["opcion_pos"] = (
             df_productos["nombre"]
             + " [Talla: " + df_productos["talla"]
-            + "] - Stock: " + df_productos["stock"].astype(str) + " doc."
+            + "] - Stock: " + df_productos["stock_doc"].round(2).astype(str) + " doc (" + df_productos["stock"].astype(str) + " un.)"
             + " - S/ " + df_productos["precio_venta"].astype(str) + " por doc."
         )
 
@@ -327,17 +345,20 @@ elif menu == "Registrar Venta (POS)":
         if st.button("➕ Agregar al Carrito"):
             p_id = df_productos.loc[idx_sel, "id"]
             p_nombre = df_productos.loc[idx_sel, "nombre"]
-            p_stock = df_productos.loc[idx_sel, "stock"]
-            p_precio = df_productos.loc[idx_sel, "precio_venta"]
+            p_stock = df_productos.loc[idx_sel, "stock"] # En unidades totales
+            p_precio = df_productos.loc[idx_sel, "precio_venta"] # Precio por docena
 
-            if cantidad_vender > p_stock:
-                st.error(f"Stock insuficiente. Disponible: {p_stock} docenas.")
+            unidades_a_vender = cantidad_vender * 12.0
+
+            if unidades_a_vender > p_stock:
+                st.error(f"Stock insuficiente. Disponible: {(p_stock/12.0):.2f} docenas ({p_stock} unidades).")
             else:
                 st.session_state.carrito_chanclas.append({
                     "id": int(p_id),
                     "nombre": p_nombre,
-                    "cantidad": float(cantidad_vender),
-                    "precio": float(p_precio),
+                    "cantidad_doc": float(cantidad_vender),
+                    "cantidad_unidades": float(unidades_a_vender),
+                    "precio_docena": float(p_precio),
                     "subtotal": float(cantidad_vender * p_precio),
                 })
                 st.success(f"Agregado: {p_nombre}")
@@ -345,7 +366,7 @@ elif menu == "Registrar Venta (POS)":
         if st.session_state.carrito_chanclas:
             st.subheader("🛍 Carrito Actual")
             df_carrito = pd.DataFrame(st.session_state.carrito_chanclas)
-            st.dataframe(df_carrito[["nombre", "cantidad", "precio", "subtotal"]], use_container_width=True)
+            st.dataframe(df_carrito[["nombre", "cantidad_doc", "precio_docena", "subtotal"]], use_container_width=True)
 
             total_original = df_carrito["subtotal"].sum()
             st.write(f"Total a cobrar: **S/ {total_original:.2f}**")
@@ -393,13 +414,13 @@ elif menu == "Registrar Venta (POS)":
                                         VALUES (:v_id, :p_id, :cant, :p_u, :sub)
                                     """),
                                     dict(
-                                        v_id=int(venta_id), p_id=int(item["id"]), cant=float(item["cantidad"]),
-                                        p_u=float(item["precio"]), sub=float(item["subtotal"]),
+                                        v_id=int(venta_id), p_id=int(item["id"]), cant=float(item["cantidad_doc"]),
+                                        p_u=float(item["precio_docena"]), sub=float(item["subtotal"]),
                                     ),
                                 )
                                 conn.execute(
                                     text("UPDATE productos SET stock = stock - :cant WHERE id = :p_id"),
-                                    dict(cant=float(item["cantidad"]), p_id=int(item["id"])),
+                                    dict(cant=float(item["cantidad_unidades"]), p_id=int(item["id"])),
                                 )
 
                         st.success(f"¡Venta registrada con éxito! N° #{venta_id:04d}")
@@ -452,30 +473,42 @@ elif menu == "Reposición de Mercadería":
     st.header("🔄 Reposición y Alerta de Stock Bajo")
     engine = conectar_db()
 
-    limite_stock = st.slider("Mostrar productos con stock (en docenas) menor o igual a:", min_value=1, max_value=20, value=5)
+    limite_docenas = st.slider("Mostrar productos con stock menor o igual a (en docenas):", min_value=1, max_value=20, value=5)
+    limite_unidades = limite_docenas * 12.0
 
-    query_stock = f"SELECT id, codigo_interno, nombre, categoria, talla, stock, precio_compra FROM productos WHERE stock <= {limite_stock} ORDER BY stock ASC"
+    query_stock = f"SELECT id, codigo_interno, nombre, categoria, talla, stock, precio_compra FROM productos WHERE stock <= {limite_unidades} ORDER BY stock ASC"
     df_reposicion = pd.read_sql(query_stock, engine)
 
     if df_reposicion.empty:
-        st.success(f"🎉 ¡Todo en orden! No hay sandalias con stock menor o igual a {limite_stock} docenas.")
+        st.success(f"🎉 ¡Todo en orden! No hay sandalias con stock menor o igual a {limite_docenas} docenas.")
     else:
-        st.warning(f"⚠️ Se encontraron {len(df_reposicion)} productos con stock bajo o agotado.")
+        st.warning(f"⚠️ Se encontraron {len(df_reposicion)} productos con stock bajo.")
         
-        st.dataframe(df_reposicion[["codigo_interno", "nombre", "categoria", "talla", "stock", "precio_compra"]], use_container_width=True)
+        df_reposicion["stock_doc"] = df_reposicion["stock"] / 12.0
+        st.dataframe(df_reposicion[["codigo_interno", "nombre", "categoria", "talla", "stock_doc", "stock", "precio_compra"]], use_container_width=True)
 
         st.divider()
         st.subheader("📥 Registrar Ingreso de Mercadería (Repostar)")
 
         with st.form("form_reposicion"):
-            df_reposicion["opcion_rep"] = df_reposicion["nombre"] + " [Talla: " + df_reposicion["talla"] + "] - Stock Actual: " + df_reposicion["stock"].astype(str) + " doc."
+            df_reposicion["opcion_rep"] = df_reposicion["nombre"] + " [Talla: " + df_reposicion["talla"] + "] - Stock Actual: " + df_reposicion["stock_doc"].round(2).astype(str) + " doc."
             prod_a_reponer = st.selectbox("Selecciona la sandalia que llegó del proveedor:", df_reposicion["opcion_rep"])
             
-            cantidad_nueva = st.number_input("Docenas que ingresan al almacén:", min_value=0.1, value=1.0, format="%.2f")
+            st.markdown("<b>📦 Cuánto ingresa (Llena docenas o unidades sueltas):</b>", unsafe_allow_html=True)
+            col_r1, col_r2 = st.columns(2)
+            with col_r1:
+                ingresa_doc = st.number_input("Docenas que ingresan", min_value=0.0, value=1.0, format="%.2f")
+            with col_r2:
+                ingresa_und = st.number_input("Unidades sueltas que ingresan", min_value=0.0, value=0.0, format="%.2f")
             
             btn_reponer = st.form_submit_button("Actualizar y Sumar al Stock")
 
             if btn_reponer:
+                if ingresa_und > 0 and ingresa_doc == 1.0:
+                    total_unidades_ingreso = ingresa_und
+                else:
+                    total_unidades_ingreso = (ingresa_doc * 12.0) + ingresa_und
+
                 idx_rep = df_reposicion[df_reposicion["opcion_rep"] == prod_a_reponer].index[0]
                 id_producto = int(df_reposicion.loc[idx_rep, "id"])
                 nombre_prod = df_reposicion.loc[idx_rep, "nombre"]
@@ -484,9 +517,9 @@ elif menu == "Reposición de Mercadería":
                     with engine.begin() as conn:
                         conn.execute(
                             text("UPDATE productos SET stock = stock + :cant WHERE id = :p_id"),
-                            dict(cant=float(cantidad_nueva), p_id=id_producto)
+                            dict(cant=float(total_unidades_ingreso), p_id=id_producto)
                         )
-                    st.success(f"✅ ¡Stock actualizado con éxito! Se sumaron {cantidad_nueva} docenas a '{nombre_prod}'.")
+                    st.success(f"✅ ¡Stock actualizado con éxito! Se sumaron {total_unidades_ingreso} unidades a '{nombre_prod}'.")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error al actualizar el stock: {e}")
