@@ -100,8 +100,8 @@ def conectar_supabase_storage():
         return None
 
 
-# --- COMPRESIÓN DE IMÁGENES ---
-def comprimir_imagen(imagen_subida, max_ancho=800, calidad=75):
+# --- COMPRESIÓN DE IMÁGENES (Límite máx. aprox. 80 KB) ---
+def comprimir_imagen(imagen_subida, max_ancho=600, calidad=65):
     img = Image.open(imagen_subida)
     if img.mode in ("RGBA", "P"):
         img = img.convert("RGB")
@@ -112,7 +112,13 @@ def comprimir_imagen(imagen_subida, max_ancho=800, calidad=75):
         img = img.resize((max_ancho, nuevo_alto), Image.Resampling.LANCZOS)
 
     buffer = BytesIO()
-    img.save(buffer, format="JPEG", quality=calidad)
+    img.save(buffer, format="JPEG", quality=calidad, optimize=True)
+    
+    # Control de seguridad: si supera los 80 KB, reduce más la calidad
+    if buffer.getbuffer().nbytes > 80 * 1024:
+        buffer = BytesIO()
+        img.save(buffer, format="JPEG", quality=50, optimize=True)
+
     buffer.seek(0)
     return buffer
 
@@ -235,7 +241,7 @@ elif menu == "Registrar Producto":
             nombre = st.text_input("Nombre / Modelo (Ej: Sandalia Anatómica de Cuero)")
             categoria = st.selectbox(
                 "Categoría",
-                ["Dama", "Caballero", "Niños", "Unisex", "Playa", "Casual"],
+                ["Dama", "Caballero", "Niño", "Niña", "Unisex"],
             )
             origen = st.selectbox("Origen del Producto", ["Nacional", "Internacional"])
         with col2:
