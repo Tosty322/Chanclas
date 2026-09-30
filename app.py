@@ -175,15 +175,18 @@ if menu == "Inventario Actual":
             for idx, (_, row) in enumerate(fila.iterrows()):
                 with cols[idx]:
                     with st.container(border=True):
-                        # Validación estricta y limpia de la URL de la foto
+                        
+                        # FILTRADO ESTRICTO DE URL (Evita que el 0 aparezca)
                         url_foto = ""
-                        if "foto_url" in row and pd.notna(row["foto_url"]):
-                            val_str = str(row["foto_url"]).strip()
-                            if val_str.startswith("http") and len(val_str) > 10:
-                                url_foto = val_str
+                        val_crudo = row.get("foto_url")
+                        
+                        if val_crudo is not None and pd.notna(val_crudo):
+                            str_val = str(val_crudo).strip()
+                            if str_val.startswith("http") and len(str_val) > 10 and str_val != "0":
+                                url_foto = str_val
 
-                        # Renderizado condicional seguro
-                        if url_foto:
+                        # Renderizado condicional limpio
+                        if url_foto != "":
                             try:
                                 st.image(url_foto, use_container_width=True)
                             except Exception:
