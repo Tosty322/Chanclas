@@ -14,15 +14,11 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- ESTILO VISUAL Y JAVASCRIPT PARA FORZAR LA VISIBILIDAD DEL BOTÓN ---
+# --- ESTILO VISUAL PERSONALIZADO (CSS) ---
+# (Sin ocultar la barra superior ni el toolbar para que todo funcione de forma nativa)
 st.markdown("""
     <style>
-    /* Ocultar elementos superiores no deseados (Deploy, GitHub, Menú de 3 puntos) */
-    .stAppToolbar {
-        visibility: hidden;
-    }
-    
-    /* Ocultar el pie de página predeterminado de Streamlit */
+    /* Ocultar únicamente el pie de página predeterminado de Streamlit */
     footer {visibility: hidden;}
 
     /* Estilo general para los títulos */
@@ -79,21 +75,6 @@ st.markdown("""
         color: #2563EB;
     }
     </style>
-
-    <script>
-    // Script para asegurar que el botón de la barra lateral esté siempre visible en la esquina superior
-    document.addEventListener("DOMContentLoaded", function() {
-        const observer = new MutationObserver(() => {
-            const sidebarBtn = document.querySelector('[data-testid="collapsedControl"]');
-            if (sidebarBtn) {
-                sidebarBtn.style.visibility = 'visible';
-                sidebarBtn.style.display = 'block';
-                sidebarBtn.style.zIndex = '999999';
-            }
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
-    });
-    </script>
 """, unsafe_allow_html=True)
 
 
