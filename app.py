@@ -14,15 +14,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- ESTILO VISUAL PERSONALIZADO (CSS) ---
+# --- ESTILO VISUAL Y JAVASCRIPT PARA FORZAR LA VISIBILIDAD DEL BOTÓN ---
 st.markdown("""
     <style>
-    /* Hacer transparente la barra superior pero permitir que el botón de la barra lateral siga visible y operativo */
-    header[data-testid="stHeader"] {
-        background-color: transparent !important;
-    }
-
-    /* Ocultar elementos específicos no deseados dentro del header (Deploy, GitHub, Menú de 3 puntos) */
+    /* Ocultar elementos superiores no deseados (Deploy, GitHub, Menú de 3 puntos) */
     .stAppToolbar {
         visibility: hidden;
     }
@@ -84,6 +79,21 @@ st.markdown("""
         color: #2563EB;
     }
     </style>
+
+    <script>
+    // Script para asegurar que el botón de la barra lateral esté siempre visible en la esquina superior
+    document.addEventListener("DOMContentLoaded", function() {
+        const observer = new MutationObserver(() => {
+            const sidebarBtn = document.querySelector('[data-testid="collapsedControl"]');
+            if (sidebarBtn) {
+                sidebarBtn.style.visibility = 'visible';
+                sidebarBtn.style.display = 'block';
+                sidebarBtn.style.zIndex = '999999';
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+    });
+    </script>
 """, unsafe_allow_html=True)
 
 
@@ -177,7 +187,6 @@ if menu == "Inventario Actual":
     if df_productos.empty:
         st.info("No hay sandalias registradas.")
     else:
-        # Mostramos los productos en una cuadrícula de 3 columnas
         columnas_por_fila = 3
         filas = [df_productos[i:i + columnas_por_fila] for i in range(0, len(df_productos), columnas_por_fila)]
 
@@ -185,7 +194,6 @@ if menu == "Inventario Actual":
             cols = st.columns(columnas_por_fila)
             for idx, (_, row) in enumerate(fila.iterrows()):
                 with cols[idx]:
-                    # Contenedor visual tipo tarjeta
                     with st.container(border=True):
                         if pd.notna(row["foto_url"]) and row["foto_url"]:
                             st.image(row["foto_url"], use_container_width=True)
