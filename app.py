@@ -7,11 +7,15 @@ from sqlalchemy import create_engine, text
 from supabase import create_client
 
 
-# --- CONEXIÓN DIRECTA A SUPABASE (POSTGRESQL) ---
+from sqlalchemy import create_engine, text
+
+
 def conectar_db():
-  # Leemos la URL desde los Secrets de Streamlit de forma directa
   db_url = st.secrets["connections"]["postgresql"]["url"]
-  # Creamos el motor con el driver psycopg2 de forma explícita
+  # Si la url empieza con postgresql://, le añadimos +psycopg2 para forzar el driver correcto
+  if db_url.startswith("postgresql://"):
+    db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
   engine = create_engine(db_url)
   return engine
 
