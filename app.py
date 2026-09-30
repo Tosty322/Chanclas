@@ -15,6 +15,11 @@ st.set_page_config(
 # --- ESTILO VISUAL PERSONALIZADO (CSS) ---
 st.markdown("""
     <style>
+    /* Ocultar la barra superior completa de Streamlit (GitHub, compartir, menú de 3 puntos) */
+    header[data-testid="stHeader"] {
+        display: none !important;
+    }
+    
     /* Ocultar el menú de hamburguesa y el pie de página predeterminado de Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
