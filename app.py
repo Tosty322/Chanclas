@@ -15,9 +15,9 @@ st.set_page_config(
 # --- ESTILO VISUAL PERSONALIZADO (CSS) ---
 st.markdown("""
     <style>
-    /* Ocultar la barra superior completa de Streamlit (GitHub, compartir, menú de 3 puntos) */
-    header[data-testid="stHeader"] {
-        display: none !important;
+    /* Ocultar elementos específicos de la barra superior (GitHub, compartir, etc.) pero conservar el botón de la barra lateral */
+    [data-testid="stToolbar"] {
+        visibility: hidden;
     }
     
     /* Ocultar el menú de hamburguesa y el pie de página predeterminado de Streamlit */
@@ -79,7 +79,6 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-
 
 # --- CONEXIÓN DIRECTA A SUPABASE (POSTGRESQL) ---
 def conectar_db():
