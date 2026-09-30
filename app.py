@@ -162,6 +162,11 @@ if menu == "Inventario Actual":
     if "foto_url" in df_productos.columns:
         df_productos["foto_url"] = df_productos["foto_url"].fillna("").astype(str)
         df_productos.loc[df_productos["foto_url"].isin(["0", "None", "nan", "NaN", "null"]), "foto_url"] = ""
+    
+    if "origen" in df_productos.columns:
+        df_productos["origen"] = df_productos["origen"].fillna("Nacional").astype(str)
+    else:
+        df_productos["origen"] = "Nacional"
 
     if df_productos.empty:
         st.info("No hay sandalias registradas.")
@@ -169,8 +174,8 @@ if menu == "Inventario Actual":
         # Iteramos uno por uno en forma de lista / filas independientes
         for _, row in df_productos.iterrows():
             with st.container(border=True):
-                # Dividimos la fila en columnas: el texto ocupa el mayor espacio y la imagen va al final (derecha)
-                col_info1, col_info2, col_info3, col_img = st.columns([3, 2, 2, 1.5])
+                # Distribuimos el espacio: Información general (col1, col2), Stock/Origen (col3), Precios (col4), Imagen (col_img)
+                col_info1, col_info2, col_info3, col_info4, col_img = st.columns([2.5, 1.8, 1.5, 1.5, 1.2])
                 
                 with col_info1:
                     st.markdown(f"<div class='product-title'>{row['nombre']}</div>", unsafe_allow_html=True)
@@ -179,9 +184,13 @@ if menu == "Inventario Actual":
 
                 with col_info2:
                     st.markdown(f"<div class='product-info'>Talla: <b>{row['talla']}</b></div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='product-info'>Stock: <b>{row['stock']} un.</b></div>", unsafe_allow_html=True)
+                    origen_badge = "🟢 Nacional" if row['origen'] == "Nacional" else "🔵 Internacional"
+                    st.markdown(f"<div class='product-info'>Origen: <b>{origen_badge}</b></div>", unsafe_allow_html=True)
 
                 with col_info3:
+                    st.markdown(f"<div class='product-info'>Stock: <b>{row['stock']} un.</b></div>", unsafe_allow_html=True)
+
+                with col_info4:
                     st.markdown(f"<div class='product-price'>S/ {row['precio_venta']:.2f}</div>", unsafe_allow_html=True)
                     st.caption(f"Costo: S/ {row['precio_compra']:.2f}")
 
@@ -189,7 +198,7 @@ if menu == "Inventario Actual":
                     url_foto = row.get("foto_url", "").strip()
                     if url_foto.startswith("http") and len(url_foto) > 10:
                         try:
-                            st.image(url_foto, width=90)
+                            st.image(url_foto, width=80)
                         except Exception:
                             st.caption("Sin foto")
                     else:
@@ -210,12 +219,14 @@ elif menu == "Registrar Producto":
                 "Categoría",
                 ["Dama", "Caballero", "Niños", "Unisex", "Playa", "Casual"],
             )
-            talla = st.text_input("Talla (Ej: 36, 37, 38 o Rango 36-39)")
+            origen = st.selectbox("Origen del Producto", ["Nacional", "Internacional"])
         with col2:
+            talla = st.text_input("Talla (Ej: 36, 37, 38 o Rango 36-39)")
             stock = st.number_input("Stock Inicial", min_value=0.0, format="%.2f")
             precio_venta = st.number_input("Precio de Venta (S/)", min_value=0.0, format="%.2f")
             precio_compra = st.number_input("Precio de Compra / Costo (S/)", min_value=0.0, format="%.2f")
-            foto_subida = st.file_uploader("Foto del Modelo", type=["jpg", "jpeg", "png", "webp"])
+            
+        foto_subida = st.file_uploader("Foto del Modelo", type=["jpg", "jpeg", "png", "webp"])
 
         submit = st.form_submit_button("Guardar Sandalia")
 
@@ -233,13 +244,14 @@ elif menu == "Registrar Producto":
                     with engine.begin() as conn:
                         conn.execute(
                             text("""
-                                INSERT INTO productos (codigo_interno, nombre, categoria, talla, stock, precio_venta, precio_compra, foto_url)
-                                VALUES (:codigo, :nombre, :categoria, :talla, :stock, :precio_venta, :precio_compra, :foto_url)
+                                INSERT INTO productos (codigo_interno, nombre, categoria, origen, talla, stock, precio_venta, precio_compra, foto_url)
+                                VALUES (:codigo, :nombre, :categoria, :origen, :talla, :stock, :precio_venta, :precio_compra, :foto_url)
                             """),
                             dict(
                                 codigo=codigo,
                                 nombre=nombre,
                                 categoria=categoria,
+                                origen=origen,
                                 talla=talla,
                                 stock=stock,
                                 precio_venta=precio_venta,
@@ -307,7 +319,7 @@ elif menu == "Registrar Venta (POS)":
                 st.success(f"Agregado: {p_nombre}")
 
         if st.session_state.carrito_chanclas:
-            st.subheader("🛍️️ Carrito Actual")
+            st.subheader("🛍 Carrito Actual")
             df_carrito = pd.DataFrame(st.session_state.carrito_chanclas)
             st.dataframe(df_carrito[["nombre", "cantidad", "precio", "subtotal"]], use_container_width=True)
 
