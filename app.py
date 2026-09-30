@@ -17,13 +17,17 @@ st.set_page_config(
 # --- ESTILO VISUAL PERSONALIZADO (CSS) ---
 st.markdown("""
     <style>
-    /* Ocultar elementos específicos de la barra superior (GitHub, compartir, etc.) pero conservar el botón de la barra lateral */
-    [data-testid="stToolbar"] {
+    /* Hacer transparente la barra superior pero permitir que el botón de la barra lateral siga visible y operativo */
+    header[data-testid="stHeader"] {
+        background-color: transparent !important;
+    }
+
+    /* Ocultar elementos específicos no deseados dentro del header (Deploy, GitHub, Menú de 3 puntos) */
+    .stAppToolbar {
         visibility: hidden;
     }
     
-    /* Ocultar el menú de hamburguesa y el pie de página predeterminado de Streamlit */
-    #MainMenu {visibility: hidden;}
+    /* Ocultar el pie de página predeterminado de Streamlit */
     footer {visibility: hidden;}
 
     /* Estilo general para los títulos */
