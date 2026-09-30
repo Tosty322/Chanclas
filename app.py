@@ -141,6 +141,14 @@ def subir_a_supabase(file_buffer, nombre_archivo, carpeta):
             return None
 
 
+# --- FUNCIÓN AUXILIAR PARA FORMATEAR STOCK ---
+def formatear_stock(total_unidades):
+    total_unidades = int(round(total_unidades))
+    docenas = total_unidades // 12
+    unidades = total_unidades % 12
+    return f"{docenas} doc. y {unidades} un."
+
+
 # --- MENÚ DE NAVEGACIÓN ---
 st.title("🩴 Sistema de Control y Ventas - Sandalias")
 st.sidebar.title("Menú de Navegación")
@@ -194,8 +202,7 @@ if menu == "Inventario Actual":
             with st.container(border=True):
                 col_info1, col_info2, col_info3, col_info4, col_img = st.columns([2.5, 1.8, 1.5, 1.5, 1.2])
                 
-                stock_unidades = float(row['stock'])
-                stock_docenas = stock_unidades / 12.0
+                stock_texto = formatear_stock(row['stock'])
 
                 with col_info1:
                     st.markdown(f"<div class='product-title'>{row['nombre']}</div>", unsafe_allow_html=True)
@@ -208,7 +215,7 @@ if menu == "Inventario Actual":
                     st.markdown(f"<div class='product-info'>Origen: <b>{origen_badge}</b></div>", unsafe_allow_html=True)
 
                 with col_info3:
-                    st.markdown(f"<div class='product-info'>Stock: <b>{stock_docenas:.2f} doc.</b><br><span style='font-size:11px;'>({stock_unidades:.0f} unidades)</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='product-info'>Stock:<br><b>{stock_texto}</b></div>", unsafe_allow_html=True)
 
                 with col_info4:
                     st.markdown(f"<div class='product-price'>S/ {row['precio_venta']:.2f}</div>", unsafe_allow_html=True)
@@ -246,13 +253,12 @@ elif menu == "Registrar Producto":
         with col2:
             talla = st.text_input("Talla (Ej: 36, 37, 38 o Rango 36-39)")
             
-            # Campos independientes para Docenas o Unidades
             st.markdown("<b>📦 Stock Inicial (Llena docenas o unidades, el otro se autocompleta):</b>", unsafe_allow_html=True)
             col_d, col_u = st.columns(2)
             with col_d:
-                input_docenas = st.number_input("Docenas", min_value=0.0, value=1.0, format="%.2f")
+                input_docenas = st.number_input("Docenas", min_value=0, value=1, step=1)
             with col_u:
-                input_unidades = st.number_input("Unidades sueltas", min_value=0.0, value=0.0, format="%.2f")
+                input_unidades = st.number_input("Unidades sueltas", min_value=0, max_value=11, value=0, step=1)
 
             precio_venta = st.number_input("Precio de Venta por Docena (S/)", min_value=0.0, format="%.2f")
             precio_compra = st.number_input("Precio de Compra / Costo por Docena (S/)", min_value=0.0, format="%.2f")
@@ -264,13 +270,11 @@ elif menu == "Registrar Producto":
 
         if submit:
             if codigo and nombre:
-                # Lógica automática: si modificó las unidades y las docenas están en su valor por defecto de 1.0 pero quiso poner otra cantidad, 
-                # determinamos cuál llenó el usuario.
-                # Calculamos el stock total en unidades base:
-                if input_unidades > 0 and input_docenas == 1.0:
+                # Lógica para autocompletar si llenó solo unidades y dejó docenas en 1 por defecto
+                if input_unidades > 0 and input_docenas == 1:
                     stock_total_unidades = input_unidades
                 else:
-                    stock_total_unidades = (input_docenas * 12.0) + input_unidades
+                    stock_total_unidades = (int(input_docenas) * 12) + int(input_unidades)
 
                 foto_url = ""
                 if foto_subida is not None:
@@ -300,7 +304,7 @@ elif menu == "Registrar Producto":
                                 apuntes=apuntes,
                             ),
                         )
-                    st.success(f"¡Sandalia '{nombre}' registrada con éxito! (Stock equivalente: {stock_total_unidades} unidades)")
+                    st.success(f"¡Sandalia '{nombre}' registrada con éxito! (Stock: {formatear_stock(stock_total_unidades)})")
                 except Exception as e:
                     st.error(f"Error al registrar (el código ya podría existir): {e}")
             else:
@@ -327,11 +331,11 @@ elif menu == "Registrar Venta (POS)":
         if "carrito_chanclas" not in st.session_state:
             st.session_state.carrito_chanclas = []
 
-        df_productos["stock_doc"] = df_productos["stock"] / 12.0
+        df_productos["stock_texto"] = df_productos["stock"].apply(formatear_stock)
         df_productos["opcion_pos"] = (
             df_productos["nombre"]
             + " [Talla: " + df_productos["talla"]
-            + "] - Stock: " + df_productos["stock_doc"].round(2).astype(str) + " doc (" + df_productos["stock"].astype(str) + " un.)"
+            + "] - Stock: " + df_productos["stock_texto"]
             + " - S/ " + df_productos["precio_venta"].astype(str) + " por doc."
         )
 
@@ -351,7 +355,7 @@ elif menu == "Registrar Venta (POS)":
             unidades_a_vender = cantidad_vender * 12.0
 
             if unidades_a_vender > p_stock:
-                st.error(f"Stock insuficiente. Disponible: {(p_stock/12.0):.2f} docenas ({p_stock} unidades).")
+                st.error(f"Stock insuficiente. Disponible: {formatear_stock(p_stock)}.")
             else:
                 st.session_state.carrito_chanclas.append({
                     "id": int(p_id),
@@ -484,30 +488,30 @@ elif menu == "Reposición de Mercadería":
     else:
         st.warning(f"⚠️ Se encontraron {len(df_reposicion)} productos con stock bajo.")
         
-        df_reposicion["stock_doc"] = df_reposicion["stock"] / 12.0
-        st.dataframe(df_reposicion[["codigo_interno", "nombre", "categoria", "talla", "stock_doc", "stock", "precio_compra"]], use_container_width=True)
+        df_reposicion["stock_formateado"] = df_reposicion["stock"].apply(formatear_stock)
+        st.dataframe(df_reposicion[["codigo_interno", "nombre", "categoria", "talla", "stock_formateado", "precio_compra"]], use_container_width=True)
 
         st.divider()
         st.subheader("📥 Registrar Ingreso de Mercadería (Repostar)")
 
         with st.form("form_reposicion"):
-            df_reposicion["opcion_rep"] = df_reposicion["nombre"] + " [Talla: " + df_reposicion["talla"] + "] - Stock Actual: " + df_reposicion["stock_doc"].round(2).astype(str) + " doc."
+            df_reposicion["opcion_rep"] = df_reposicion["nombre"] + " [Talla: " + df_reposicion["talla"] + "] - Stock Actual: " + df_reposicion["stock_formateado"]
             prod_a_reponer = st.selectbox("Selecciona la sandalia que llegó del proveedor:", df_reposicion["opcion_rep"])
             
             st.markdown("<b>📦 Cuánto ingresa (Llena docenas o unidades sueltas):</b>", unsafe_allow_html=True)
             col_r1, col_r2 = st.columns(2)
             with col_r1:
-                ingresa_doc = st.number_input("Docenas que ingresan", min_value=0.0, value=1.0, format="%.2f")
+                ingresa_doc = st.number_input("Docenas que ingresan", min_value=0, value=1, step=1)
             with col_r2:
-                ingresa_und = st.number_input("Unidades sueltas que ingresan", min_value=0.0, value=0.0, format="%.2f")
+                ingresa_und = st.number_input("Unidades sueltas que ingresan", min_value=0, max_value=11, value=0, step=1)
             
             btn_reponer = st.form_submit_button("Actualizar y Sumar al Stock")
 
             if btn_reponer:
-                if ingresa_und > 0 and ingresa_doc == 1.0:
+                if ingresa_und > 0 and ingresa_doc == 1:
                     total_unidades_ingreso = ingresa_und
                 else:
-                    total_unidades_ingreso = (ingresa_doc * 12.0) + ingresa_und
+                    total_unidades_ingreso = (int(ingresa_doc) * 12) + int(ingresa_und)
 
                 idx_rep = df_reposicion[df_reposicion["opcion_rep"] == prod_a_reponer].index[0]
                 id_producto = int(df_reposicion.loc[idx_rep, "id"])
@@ -519,7 +523,7 @@ elif menu == "Reposición de Mercadería":
                             text("UPDATE productos SET stock = stock + :cant WHERE id = :p_id"),
                             dict(cant=float(total_unidades_ingreso), p_id=id_producto)
                         )
-                    st.success(f"✅ ¡Stock actualizado con éxito! Se sumaron {total_unidades_ingreso} unidades a '{nombre_prod}'.")
+                    st.success(f"✅ ¡Stock actualizado con éxito! Se sumó {formatear_stock(total_unidades_ingreso)} a '{nombre_prod}'.")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error al actualizar el stock: {e}")
