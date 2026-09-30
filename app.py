@@ -159,7 +159,7 @@ menu = st.sidebar.selectbox(
 )
 
 # -------------------------------------------------------------
-# 1. INVENTARIO ACTUAL (EN FORMATO DE FILAS HORIZONTALES)
+# 1. INVENTARIO ACTUAL
 # -------------------------------------------------------------
 if menu == "Inventario Actual":
     engine = conectar_db()
@@ -192,7 +192,6 @@ if menu == "Inventario Actual":
     if df_productos.empty:
         st.info("No hay sandalias registradas.")
     else:
-        # Iteramos uno por uno en forma de lista / filas independientes
         for _, row in df_productos.iterrows():
             with st.container(border=True):
                 col_info1, col_info2, col_info3, col_info4, col_img = st.columns([2.5, 1.8, 1.5, 1.5, 1.2])
@@ -208,7 +207,7 @@ if menu == "Inventario Actual":
                     st.markdown(f"<div class='product-info'>Origen: <b>{origen_badge}</b></div>", unsafe_allow_html=True)
 
                 with col_info3:
-                    st.markdown(f"<div class='product-info'>Stock: <b>{row['stock']} un.</b></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='product-info'>Stock: <b>{row['stock']} doc.</b></div>", unsafe_allow_html=True)
 
                 with col_info4:
                     st.markdown(f"<div class='product-price'>S/ {row['precio_venta']:.2f}</div>", unsafe_allow_html=True)
@@ -224,7 +223,6 @@ if menu == "Inventario Actual":
                     else:
                         st.caption("Sin foto")
 
-                # Mostrar apuntes debajo si existen
                 if row['apuntes'].strip():
                     st.markdown(f"<div class='product-notes'>📝 <b>Apunte:</b> {row['apuntes']}</div>", unsafe_allow_html=True)
 
@@ -241,14 +239,14 @@ elif menu == "Registrar Producto":
             nombre = st.text_input("Nombre / Modelo (Ej: Sandalia Anatómica de Cuero)")
             categoria = st.selectbox(
                 "Categoría",
-                ["Dama", "Caballero", "Niño", "Niña", "Unisex"],
+                ["Dama", "Caballero", "Niño", "Niña", "Juvenil"],
             )
             origen = st.selectbox("Origen del Producto", ["Nacional", "Internacional"])
         with col2:
             talla = st.text_input("Talla (Ej: 36, 37, 38 o Rango 36-39)")
-            stock = st.number_input("Stock Inicial", min_value=0.0, format="%.2f")
-            precio_venta = st.number_input("Precio de Venta (S/)", min_value=0.0, format="%.2f")
-            precio_compra = st.number_input("Precio de Compra / Costo (S/)", min_value=0.0, format="%.2f")
+            stock = st.number_input("Stock Inicial (en Docenas)", min_value=0.0, format="%.2f", help="Ingrese la cantidad en docenas (ej: 1 = una docena, 0.5 = media docena)")
+            precio_venta = st.number_input("Precio de Venta por Docena (S/)", min_value=0.0, format="%.2f")
+            precio_compra = st.number_input("Precio de Compra / Costo por Docena (S/)", min_value=0.0, format="%.2f")
             
         apuntes = st.text_area("Apuntes u Observaciones (Opcional)", placeholder="Ej: Material sintético importado de Brasil, horma pequeña...")
         foto_subida = st.file_uploader("Foto del Modelo", type=["jpg", "jpeg", "png", "webp"])
@@ -315,8 +313,8 @@ elif menu == "Registrar Venta (POS)":
         df_productos["opcion_pos"] = (
             df_productos["nombre"]
             + " [Talla: " + df_productos["talla"]
-            + "] - Stock: " + df_productos["stock"].astype(str)
-            + " - S/ " + df_productos["precio_venta"].astype(str)
+            + "] - Stock: " + df_productos["stock"].astype(str) + " doc."
+            + " - S/ " + df_productos["precio_venta"].astype(str) + " por doc."
         )
 
         col_select, col_cant = st.columns([3, 1])
@@ -324,7 +322,7 @@ elif menu == "Registrar Venta (POS)":
             prod_elegido = st.selectbox("Selecciona el producto:", df_productos["opcion_pos"])
         with col_cant:
             idx_sel = df_productos[df_productos["opcion_pos"] == prod_elegido].index[0]
-            cantidad_vender = st.number_input("Cantidad", min_value=0.01, value=1.00, format="%.2f")
+            cantidad_vender = st.number_input("Docenas a vender", min_value=0.01, value=1.00, format="%.2f")
 
         if st.button("➕ Agregar al Carrito"):
             p_id = df_productos.loc[idx_sel, "id"]
@@ -333,7 +331,7 @@ elif menu == "Registrar Venta (POS)":
             p_precio = df_productos.loc[idx_sel, "precio_venta"]
 
             if cantidad_vender > p_stock:
-                st.error(f"Stock insuficiente. Disponible: {p_stock}")
+                st.error(f"Stock insuficiente. Disponible: {p_stock} docenas.")
             else:
                 st.session_state.carrito_chanclas.append({
                     "id": int(p_id),
@@ -426,7 +424,7 @@ elif menu == "Historial de Ventas":
             v.fecha_hora,
             p.nombre AS sandalia,
             p.talla,
-            dv.cantidad,
+            dv.cantidad AS docenas,
             dv.subtotal,
             v.metodo_pago,
             v.boleta_url
@@ -454,13 +452,13 @@ elif menu == "Reposición de Mercadería":
     st.header("🔄 Reposición y Alerta de Stock Bajo")
     engine = conectar_db()
 
-    limite_stock = st.slider("Mostrar productos con stock menor o igual a:", min_value=1, max_value=20, value=5)
+    limite_stock = st.slider("Mostrar productos con stock (en docenas) menor o igual a:", min_value=1, max_value=20, value=5)
 
     query_stock = f"SELECT id, codigo_interno, nombre, categoria, talla, stock, precio_compra FROM productos WHERE stock <= {limite_stock} ORDER BY stock ASC"
     df_reposicion = pd.read_sql(query_stock, engine)
 
     if df_reposicion.empty:
-        st.success(f"🎉 ¡Todo en orden! No hay sandalias con stock menor o igual a {limite_stock} unidades.")
+        st.success(f"🎉 ¡Todo en orden! No hay sandalias con stock menor o igual a {limite_stock} docenas.")
     else:
         st.warning(f"⚠️ Se encontraron {len(df_reposicion)} productos con stock bajo o agotado.")
         
@@ -470,10 +468,10 @@ elif menu == "Reposición de Mercadería":
         st.subheader("📥 Registrar Ingreso de Mercadería (Repostar)")
 
         with st.form("form_reposicion"):
-            df_reposicion["opcion_rep"] = df_reposicion["nombre"] + " [Talla: " + df_reposicion["talla"] + "] - Stock Actual: " + df_reposicion["stock"].astype(str)
+            df_reposicion["opcion_rep"] = df_reposicion["nombre"] + " [Talla: " + df_reposicion["talla"] + "] - Stock Actual: " + df_reposicion["stock"].astype(str) + " doc."
             prod_a_reponer = st.selectbox("Selecciona la sandalia que llegó del proveedor:", df_reposicion["opcion_rep"])
             
-            cantidad_nueva = st.number_input("Cantidad de unidades que ingresan al almacén:", min_value=1.0, value=10.0, format="%.2f")
+            cantidad_nueva = st.number_input("Docenas que ingresan al almacén:", min_value=0.1, value=1.0, format="%.2f")
             
             btn_reponer = st.form_submit_button("Actualizar y Sumar al Stock")
 
@@ -488,7 +486,7 @@ elif menu == "Reposición de Mercadería":
                             text("UPDATE productos SET stock = stock + :cant WHERE id = :p_id"),
                             dict(cant=float(cantidad_nueva), p_id=id_producto)
                         )
-                    st.success(f"✅ ¡Stock actualizado con éxito! Se sumaron {cantidad_nueva} unidades a '{nombre_prod}'.")
+                    st.success(f"✅ ¡Stock actualizado con éxito! Se sumaron {cantidad_nueva} docenas a '{nombre_prod}'.")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error al actualizar el stock: {e}")
