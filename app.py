@@ -41,32 +41,26 @@ st.markdown("""
         border-color: #1D4ED8;
     }
 
-    /* Estilo para las tarjetas de productos (Grid / Cards) */
-    .product-card {
+    /* Estilo para las filas de productos (Diseño en lista horizontal) */
+    .product-row {
         background-color: #ffffff;
         border: 1px solid #E5E7EB;
-        border-radius: 12px;
-        padding: 16px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-        margin-bottom: 20px;
-        text-align: center;
-        height: 100%;
-    }
-    .product-card img {
-        border-radius: 8px;
-        object-fit: cover;
-        margin-bottom: 10px;
+        border-radius: 10px;
+        padding: 12px 16px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
     }
     .product-title {
         font-size: 16px;
         font-weight: bold;
         color: #1F2937;
-        margin-bottom: 4px;
+        margin-bottom: 2px;
     }
     .product-info {
         font-size: 13px;
         color: #6B7280;
-        margin-bottom: 8px;
     }
     .product-price {
         font-size: 18px;
@@ -150,7 +144,7 @@ menu = st.sidebar.selectbox(
 )
 
 # -------------------------------------------------------------
-# 1. INVENTARIO ACTUAL (CON DISEÑO DE TARJETAS TIPO GRID)
+# 1. INVENTARIO ACTUAL (EN FORMATO DE FILAS HORIZONTALES)
 # -------------------------------------------------------------
 if menu == "Inventario Actual":
     engine = conectar_db()
@@ -164,7 +158,7 @@ if menu == "Inventario Actual":
 
     df_productos = pd.read_sql(query, engine)
 
-    # LIMPIEZA TOTAL DEL DATAFRAME: Forzar que ceros o nulos en foto_url sean cadenas vacías
+    # Limpieza de datos por seguridad
     if "foto_url" in df_productos.columns:
         df_productos["foto_url"] = df_productos["foto_url"].fillna("").astype(str)
         df_productos.loc[df_productos["foto_url"].isin(["0", "None", "nan", "NaN", "null"]), "foto_url"] = ""
@@ -172,32 +166,34 @@ if menu == "Inventario Actual":
     if df_productos.empty:
         st.info("No hay sandalias registradas.")
     else:
-        columnas_por_fila = 3
-        filas = [df_productos[i:i + columnas_por_fila] for i in range(0, len(df_productos), columnas_por_fila)]
+        # Iteramos uno por uno en forma de lista / filas independientes
+        for _, row in df_productos.iterrows():
+            with st.container(border=True):
+                # Dividimos la fila en columnas: el texto ocupa el mayor espacio y la imagen va al final (derecha)
+                col_info1, col_info2, col_info3, col_img = st.columns([3, 2, 2, 1.5])
+                
+                with col_info1:
+                    st.markdown(f"<div class='product-title'>{row['nombre']}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='product-info'>Código: <b>{row['codigo_interno']}</b></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='product-info'>Categoría: <b>{row['categoria']}</b></div>", unsafe_allow_html=True)
 
-        for fila in filas:
-            cols = st.columns(columnas_por_fila)
-            for idx, (_, row) in enumerate(fila.iterrows()):
-                with cols[idx]:
-                    with st.container(border=True):
-                        
-                        # Extracción segura de la URL ya limpia
-                        url_foto = row.get("foto_url", "").strip()
+                with col_info2:
+                    st.markdown(f"<div class='product-info'>Talla: <b>{row['talla']}</b></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='product-info'>Stock: <b>{row['stock']} un.</b></div>", unsafe_allow_html=True)
 
-                        # Renderizado condicional estricto
-                        if url_foto.startswith("http") and len(url_foto) > 10:
-                            try:
-                                st.image(url_foto, use_container_width=True)
-                            except Exception:
-                                st.info("Sin foto disponible")
-                        else:
-                            st.info("Sin foto disponible")
-                        
-                        st.markdown(f"<div class='product-title'>{row['nombre']}</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='product-info'>Cod: <b>{row['codigo_interno']}</b> | Cat: <b>{row['categoria']}</b></div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='product-info'>Talla: <b>{row['talla']}</b> | Stock: <b>{row['stock']} un.</b></div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='product-price'>S/ {row['precio_venta']:.2f}</div>", unsafe_allow_html=True)
-                        st.caption(f"Costo: S/ {row['precio_compra']:.2f}")
+                with col_info3:
+                    st.markdown(f"<div class='product-price'>S/ {row['precio_venta']:.2f}</div>", unsafe_allow_html=True)
+                    st.caption(f"Costo: S/ {row['precio_compra']:.2f}")
+
+                with col_img:
+                    url_foto = row.get("foto_url", "").strip()
+                    if url_foto.startswith("http") and len(url_foto) > 10:
+                        try:
+                            st.image(url_foto, width=90)
+                        except Exception:
+                            st.caption("Sin foto")
+                    else:
+                        st.caption("Sin foto")
 
 # -------------------------------------------------------------
 # 2. REGISTRAR PRODUCTO
@@ -311,7 +307,7 @@ elif menu == "Registrar Venta (POS)":
                 st.success(f"Agregado: {p_nombre}")
 
         if st.session_state.carrito_chanclas:
-            st.subheader("🛍️ Carrito Actual")
+            st.subheader("🛍️️ Carrito Actual")
             df_carrito = pd.DataFrame(st.session_state.carrito_chanclas)
             st.dataframe(df_carrito[["nombre", "cantidad", "precio", "subtotal"]], use_container_width=True)
 
