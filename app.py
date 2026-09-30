@@ -44,6 +44,39 @@ st.markdown("""
         background-color: #1D4ED8;
         border-color: #1D4ED8;
     }
+
+    /* Estilo para las tarjetas de productos (Grid / Cards) */
+    .product-card {
+        background-color: #ffffff;
+        border: 1px solid #E5E7EB;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        margin-bottom: 20px;
+        text-align: center;
+        height: 100%;
+    }
+    .product-card img {
+        border-radius: 8px;
+        object-fit: cover;
+        margin-bottom: 10px;
+    }
+    .product-title {
+        font-size: 16px;
+        font-weight: bold;
+        color: #1F2937;
+        margin-bottom: 4px;
+    }
+    .product-info {
+        font-size: 13px;
+        color: #6B7280;
+        margin-bottom: 8px;
+    }
+    .product-price {
+        font-size: 18px;
+        font-weight: bold;
+        color: #2563EB;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -121,7 +154,7 @@ menu = st.sidebar.selectbox(
 )
 
 # -------------------------------------------------------------
-# 1. INVENTARIO ACTUAL
+# 1. INVENTARIO ACTUAL (CON DISEÑO DE TARJETAS TIPO GRID)
 # -------------------------------------------------------------
 if menu == "Inventario Actual":
     engine = conectar_db()
@@ -138,24 +171,26 @@ if menu == "Inventario Actual":
     if df_productos.empty:
         st.info("No hay sandalias registradas.")
     else:
-        for _, row in df_productos.iterrows():
-            cols = st.columns([1, 3])
-            with cols[0]:
-                if pd.notna(row["foto_url"]) and row["foto_url"]:
-                    st.image(row["foto_url"], width=120)
-                else:
-                    st.info("Sin foto")
-            with cols[1]:
-                st.subheader(f"{row['nombre']} (Código: {row['codigo_interno']})")
-                st.write(
-                    f"**Categoría:** {row['categoria']} | **Talla:** {row['talla']} |"
-                    f" **Stock:** {row['stock']} un."
-                )
-                st.write(
-                    f"**Precio Compra:** S/ {row['precio_compra']:.2f} | **Precio Venta:**"
-                    f" S/ {row['precio_venta']:.2f}"
-                )
-            st.divider()
+        # Mostramos los productos en una cuadrícula de 3 columnas
+        columnas_por_fila = 3
+        filas = [df_productos[i:i + columnas_por_fila] for i in range(0, len(df_productos), columnas_por_fila)]
+
+        for fila in filas:
+            cols = st.columns(columnas_por_fila)
+            for idx, (_, row) in enumerate(fila.iterrows()):
+                with cols[idx]:
+                    # Contenedor visual tipo tarjeta
+                    with st.container(border=True):
+                        if pd.notna(row["foto_url"]) and row["foto_url"]:
+                            st.image(row["foto_url"], use_container_width=True)
+                        else:
+                            st.info("Sin foto disponible")
+                        
+                        st.markdown(f"<div class='product-title'>{row['nombre']}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='product-info'>Cod: <b>{row['codigo_interno']}</b> | Cat: <b>{row['categoria']}</b></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='product-info'>Talla: <b>{row['talla']}</b> | Stock: <b>{row['stock']} un.</b></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='product-price'>S/ {row['precio_venta']:.2f}</div>", unsafe_allow_html=True)
+                        st.caption(f"Costo: S/ {row['precio_compra']:.2f}")
 
 # -------------------------------------------------------------
 # 2. REGISTRAR PRODUCTO
