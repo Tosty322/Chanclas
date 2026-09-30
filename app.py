@@ -170,13 +170,13 @@ if menu == "Inventario Actual":
         columnas_por_fila = 3
         filas = [df_productos[i:i + columnas_por_fila] for i in range(0, len(df_productos), columnas_por_fila)]
 
-        for fila in filas:
+      for fila in filas:
             cols = st.columns(columnas_por_fila)
             for idx, (_, row) in enumerate(fila.iterrows()):
                 with cols[idx]:
                     with st.container(border=True):
                         url_foto = str(row["foto_url"]) if pd.notna(row["foto_url"]) else ""
-                        if url_foto.startswith("http"):
+                        if url_foto.startswith("http") and len(url_foto) > 10:
                             st.image(url_foto, use_container_width=True)
                         else:
                             st.info("Sin foto disponible")
@@ -186,7 +186,6 @@ if menu == "Inventario Actual":
                         st.markdown(f"<div class='product-info'>Talla: <b>{row['talla']}</b> | Stock: <b>{row['stock']} un.</b></div>", unsafe_allow_html=True)
                         st.markdown(f"<div class='product-price'>S/ {row['precio_venta']:.2f}</div>", unsafe_allow_html=True)
                         st.caption(f"Costo: S/ {row['precio_compra']:.2f}")
-
 # -------------------------------------------------------------
 # 2. REGISTRAR PRODUCTO
 # -------------------------------------------------------------
