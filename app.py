@@ -7,10 +7,45 @@ from sqlalchemy import create_engine, text
 from supabase import create_client
 
 
+# --- CONFIGURACIÓN DE PÁGINA ---
+st.set_page_config(
+    page_title="Sistema de Ventas - Sandalias", layout="wide"
+)
+
+# --- APLICAR ESTILO VISUAL PERSONALIZADO (PUNTO 1) ---
+st.markdown("""
+    <style>
+    /* Ocultar el menú de hamburguesa y el pie de página predeterminado de Streamlit */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+
+    /* Estilo general para los títulos */
+    h1, h2, h3 {
+        color: #1E3A8A; /* Azul corporativo oscuro */
+        font-family: 'Helvetica Neue', sans-serif;
+    }
+
+    /* Estilo moderno para los botones principales */
+    div.stButton > button {
+        background-color: #2563EB;
+        color: white;
+        border-radius: 8px;
+        border: none;
+        padding: 0.5rem 1rem;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+    div.stButton > button:hover {
+        background-color: #1D4ED8;
+        border-color: #1D4ED8;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+
 # --- CONEXIÓN DIRECTA A SUPABASE (POSTGRESQL) ---
 def conectar_db():
     db_url = st.secrets["connections"]["postgresql"]["url"]
-    # Si la url empieza con postgresql://, le añadimos +psycopg2 para forzar el driver correcto
     if db_url.startswith("postgresql://"):
         db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
     
