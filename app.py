@@ -62,6 +62,15 @@ st.markdown("""
         font-size: 13px;
         color: #6B7280;
     }
+    .product-notes {
+        font-size: 12px;
+        color: #4B5563;
+        background-color: #F3F4F6;
+        padding: 4px 8px;
+        border-radius: 6px;
+        margin-top: 4px;
+        border-left: 3px solid #2563EB;
+    }
     .product-price {
         font-size: 18px;
         font-weight: bold;
@@ -168,13 +177,18 @@ if menu == "Inventario Actual":
     else:
         df_productos["origen"] = "Nacional"
 
+    if "apuntes" in df_productos.columns:
+        df_productos["apuntes"] = df_productos["apuntes"].fillna("").astype(str)
+        df_productos.loc[df_productos["apuntes"].isin(["None", "nan", "NaN", "null"]), "apuntes"] = ""
+    else:
+        df_productos["apuntes"] = ""
+
     if df_productos.empty:
         st.info("No hay sandalias registradas.")
     else:
         # Iteramos uno por uno en forma de lista / filas independientes
         for _, row in df_productos.iterrows():
             with st.container(border=True):
-                # Distribuimos el espacio: Información general (col1, col2), Stock/Origen (col3), Precios (col4), Imagen (col_img)
                 col_info1, col_info2, col_info3, col_info4, col_img = st.columns([2.5, 1.8, 1.5, 1.5, 1.2])
                 
                 with col_info1:
@@ -204,6 +218,10 @@ if menu == "Inventario Actual":
                     else:
                         st.caption("Sin foto")
 
+                # Mostrar apuntes debajo si existen
+                if row['apuntes'].strip():
+                    st.markdown(f"<div class='product-notes'>📝 <b>Apunte:</b> {row['apuntes']}</div>", unsafe_allow_html=True)
+
 # -------------------------------------------------------------
 # 2. REGISTRAR PRODUCTO
 # -------------------------------------------------------------
@@ -226,6 +244,7 @@ elif menu == "Registrar Producto":
             precio_venta = st.number_input("Precio de Venta (S/)", min_value=0.0, format="%.2f")
             precio_compra = st.number_input("Precio de Compra / Costo (S/)", min_value=0.0, format="%.2f")
             
+        apuntes = st.text_area("Apuntes u Observaciones (Opcional)", placeholder="Ej: Material sintético importado de Brasil, horma pequeña...")
         foto_subida = st.file_uploader("Foto del Modelo", type=["jpg", "jpeg", "png", "webp"])
 
         submit = st.form_submit_button("Guardar Sandalia")
@@ -244,8 +263,8 @@ elif menu == "Registrar Producto":
                     with engine.begin() as conn:
                         conn.execute(
                             text("""
-                                INSERT INTO productos (codigo_interno, nombre, categoria, origen, talla, stock, precio_venta, precio_compra, foto_url)
-                                VALUES (:codigo, :nombre, :categoria, :origen, :talla, :stock, :precio_venta, :precio_compra, :foto_url)
+                                INSERT INTO productos (codigo_interno, nombre, categoria, origen, talla, stock, precio_venta, precio_compra, foto_url, apuntes)
+                                VALUES (:codigo, :nombre, :categoria, :origen, :talla, :stock, :precio_venta, :precio_compra, :foto_url, :apuntes)
                             """),
                             dict(
                                 codigo=codigo,
@@ -257,6 +276,7 @@ elif menu == "Registrar Producto":
                                 precio_venta=precio_venta,
                                 precio_compra=precio_compra,
                                 foto_url=foto_url,
+                                apuntes=apuntes,
                             ),
                         )
                     st.success(f"¡Sandalia '{nombre}' registrada con éxito!")
