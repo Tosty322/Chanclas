@@ -175,7 +175,12 @@ if menu == "Inventario Actual":
             for idx, (_, row) in enumerate(fila.iterrows()):
                 with cols[idx]:
                     with st.container(border=True):
-                        url_foto = str(row["foto_url"]) if pd.notna(row["foto_url"]) else ""
+                        # Extraer la URL usando estrictamente el índice 8 (donde está foto_url)
+                        try:
+                            url_foto = str(row.iloc[8]) if pd.notna(row.iloc[8]) else ""
+                        except Exception:
+                            url_foto = str(row["foto_url"]) if "foto_url" in row and pd.notna(row["foto_url"]) else ""
+
                         if url_foto.startswith("http") and len(url_foto) > 10:
                             st.image(url_foto, use_container_width=True)
                         else:
