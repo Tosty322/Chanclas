@@ -9,7 +9,9 @@ from supabase import create_client
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
-    page_title="Sistema de Ventas - Sandalias", layout="wide"
+    page_title="Sistema de Ventas - Sandalias", 
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 # --- ESTILO VISUAL PERSONALIZADO (CSS) ---
@@ -79,6 +81,7 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
 
 # --- CONEXIÓN DIRECTA A SUPABASE (POSTGRESQL) ---
 def conectar_db():
