@@ -170,7 +170,7 @@ if menu == "Inventario Actual":
         columnas_por_fila = 3
         filas = [df_productos[i:i + columnas_por_fila] for i in range(0, len(df_productos), columnas_por_fila)]
 
-      for fila in filas:
+        for fila in filas:
             cols = st.columns(columnas_por_fila)
             for idx, (_, row) in enumerate(fila.iterrows()):
                 with cols[idx]:
@@ -186,6 +186,7 @@ if menu == "Inventario Actual":
                         st.markdown(f"<div class='product-info'>Talla: <b>{row['talla']}</b> | Stock: <b>{row['stock']} un.</b></div>", unsafe_allow_html=True)
                         st.markdown(f"<div class='product-price'>S/ {row['precio_venta']:.2f}</div>", unsafe_allow_html=True)
                         st.caption(f"Costo: S/ {row['precio_compra']:.2f}")
+
 # -------------------------------------------------------------
 # 2. REGISTRAR PRODUCTO
 # -------------------------------------------------------------
