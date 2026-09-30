@@ -253,13 +253,12 @@ elif menu == "Registrar Producto":
         with col2:
             talla = st.text_input("Talla (Ej: 36, 37, 38 o Rango 36-39)")
             
-            st.markdown("<b>📦 Stock Inicial (Ingrese el total de unidades sueltas):</b>", unsafe_allow_html=True)
-            stock_inicial_unidades = st.number_input("Cantidad total de unidades", min_value=0, value=12, step=1)
-            
-            # Desglose dinámico en pantalla para que el usuario previsualice
-            doc_prev = stock_inicial_unidades // 12
-            und_prev = stock_inicial_unidades % 12
-            st.info(f"💡 Equivale a: **{doc_prev} docenas y {und_prev} unidades**")
+            st.markdown("<b>📦 Stock Inicial (Llena docenas o unidades, el otro se autocompleta):</b>", unsafe_allow_html=True)
+            col_d, col_u = st.columns(2)
+            with col_d:
+                input_docenas = st.number_input("Docenas", min_value=0, value=1, step=1)
+            with col_u:
+                input_unidades = st.number_input("Unidades sueltas", min_value=0, max_value=11, value=0, step=1)
 
             precio_venta = st.number_input("Precio de Venta por Docena (S/)", min_value=0.0, format="%.2f")
             precio_compra = st.number_input("Precio de Compra / Costo por Docena (S/)", min_value=0.0, format="%.2f")
@@ -271,6 +270,12 @@ elif menu == "Registrar Producto":
 
         if submit:
             if codigo and nombre:
+                # Lógica para autocompletar si llenó solo unidades y dejó docenas en 1 por defecto
+                if input_unidades > 0 and input_docenas == 1:
+                    stock_total_unidades = input_unidades
+                else:
+                    stock_total_unidades = (int(input_docenas) * 12) + int(input_unidades)
+
                 foto_url = ""
                 if foto_subida is not None:
                     with st.spinner("Subiendo foto..."):
@@ -292,14 +297,14 @@ elif menu == "Registrar Producto":
                                 categoria=categoria,
                                 origen=origen,
                                 talla=talla,
-                                stock=float(stock_inicial_unidades),
+                                stock=float(stock_total_unidades),
                                 precio_venta=precio_venta,
                                 precio_compra=precio_compra,
                                 foto_url=foto_url,
                                 apuntes=apuntes,
                             ),
                         )
-                    st.success(f"¡Sandalia '{nombre}' registrada con éxito! (Stock: {formatear_stock(stock_inicial_unidades)})")
+                    st.success(f"¡Sandalia '{nombre}' registrada con éxito! (Stock: {formatear_stock(stock_total_unidades)})")
                 except Exception as e:
                     st.error(f"Error al registrar (el código ya podría existir): {e}")
             else:
@@ -493,17 +498,21 @@ elif menu == "Reposición de Mercadería":
             df_reposicion["opcion_rep"] = df_reposicion["nombre"] + " [Talla: " + df_reposicion["talla"] + "] - Stock Actual: " + df_reposicion["stock_formateado"]
             prod_a_reponer = st.selectbox("Selecciona la sandalia que llegó del proveedor:", df_reposicion["opcion_rep"])
             
-            st.markdown("<b>📦 Cuánto ingresa (Ingrese el total de unidades, ej: 30):</b>", unsafe_allow_html=True)
-            total_unidades_ingreso = st.number_input("Cantidad total de unidades que ingresan", min_value=0, value=12, step=1)
-            
-            # Desglose en tiempo real
-            doc_ing_prev = total_unidades_ingreso // 12
-            und_ing_prev = total_unidades_ingreso % 12
-            st.info(f"💡 Equivale a: **{doc_ing_prev} docenas y {und_ing_prev} unidades**")
+            st.markdown("<b>📦 Cuánto ingresa (Llena docenas o unidades sueltas):</b>", unsafe_allow_html=True)
+            col_r1, col_r2 = st.columns(2)
+            with col_r1:
+                ingresa_doc = st.number_input("Docenas que ingresan", min_value=0, value=1, step=1)
+            with col_r2:
+                ingresa_und = st.number_input("Unidades sueltas que ingresan", min_value=0, max_value=11, value=0, step=1)
             
             btn_reponer = st.form_submit_button("Actualizar y Sumar al Stock")
 
             if btn_reponer:
+                if ingresa_und > 0 and ingresa_doc == 1:
+                    total_unidades_ingreso = ingresa_und
+                else:
+                    total_unidades_ingreso = (int(ingresa_doc) * 12) + int(ingresa_und)
+
                 idx_rep = df_reposicion[df_reposicion["opcion_rep"] == prod_a_reponer].index[0]
                 id_producto = int(df_reposicion.loc[idx_rep, "id"])
                 nombre_prod = df_reposicion.loc[idx_rep, "nombre"]
