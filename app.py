@@ -167,11 +167,6 @@ if menu == "Inventario Actual":
     if df_productos.empty:
         st.info("No hay sandalias registradas.")
     else:
-        # Panel de depuración para ver qué nombres de columnas y datos trae Pandas
-        with st.expander("🛠️ Depuración de columnas y datos (Click para ver)"):
-            st.write("Columnas detectadas:", df_productos.columns.tolist())
-            st.dataframe(df_productos.head(3))
-
         columnas_por_fila = 3
         filas = [df_productos[i:i + columnas_por_fila] for i in range(0, len(df_productos), columnas_por_fila)]
 
@@ -180,21 +175,19 @@ if menu == "Inventario Actual":
             for idx, (_, row) in enumerate(fila.iterrows()):
                 with cols[idx]:
                     with st.container(border=True):
-                        # Extracción segura de la URL con validación estricta
+                        # Validación estricta y limpia de la URL de la foto
                         url_foto = ""
-                        if "foto_url" in row:
-                            val = row["foto_url"]
-                            if pd.notna(val):
-                                val_str = str(val).strip()
-                                if val_str.startswith("http") and len(val_str) > 10:
-                                    url_foto = val_str
+                        if "foto_url" in row and pd.notna(row["foto_url"]):
+                            val_str = str(row["foto_url"]).strip()
+                            if val_str.startswith("http") and len(val_str) > 10:
+                                url_foto = val_str
 
-                        # Renderizado de imagen o mensaje predeterminado
+                        # Renderizado condicional seguro
                         if url_foto:
                             try:
                                 st.image(url_foto, use_container_width=True)
                             except Exception:
-                                st.info("Error al cargar imagen")
+                                st.info("Sin foto disponible")
                         else:
                             st.info("Sin foto disponible")
                         
