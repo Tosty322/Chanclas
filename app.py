@@ -167,6 +167,11 @@ if menu == "Inventario Actual":
     if df_productos.empty:
         st.info("No hay sandalias registradas.")
     else:
+        # Panel de depuración para ver qué nombres de columnas y datos trae Pandas
+        with st.expander("🛠️ Depuración de columnas y datos (Click para ver)"):
+            st.write("Columnas detectadas:", df_productos.columns.tolist())
+            st.dataframe(df_productos.head(3))
+
         columnas_por_fila = 3
         filas = [df_productos[i:i + columnas_por_fila] for i in range(0, len(df_productos), columnas_por_fila)]
 
@@ -175,15 +180,21 @@ if menu == "Inventario Actual":
             for idx, (_, row) in enumerate(fila.iterrows()):
                 with cols[idx]:
                     with st.container(border=True):
-                        # Validación limpia y segura por nombre de columna
+                        # Extracción segura de la URL con validación estricta
                         url_foto = ""
-                        if "foto_url" in row and pd.notna(row["foto_url"]):
-                            val = str(row["foto_url"]).strip()
-                            if val.startswith("http") and len(val) > 10:
-                                url_foto = val
+                        if "foto_url" in row:
+                            val = row["foto_url"]
+                            if pd.notna(val):
+                                val_str = str(val).strip()
+                                if val_str.startswith("http") and len(val_str) > 10:
+                                    url_foto = val_str
 
+                        # Renderizado de imagen o mensaje predeterminado
                         if url_foto:
-                            st.image(url_foto, use_container_width=True)
+                            try:
+                                st.image(url_foto, use_container_width=True)
+                            except Exception:
+                                st.info("Error al cargar imagen")
                         else:
                             st.info("Sin foto disponible")
                         
