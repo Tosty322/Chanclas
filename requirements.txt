@@ -1,0 +1,6 @@
+streamlit
+pandas
+sqlalchemy
+pillow
+supabase
+psycopg2-binary
