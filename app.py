@@ -9,7 +9,9 @@ from supabase import create_client
 
 # --- CONEXIÓN A SUPABASE (DB) ---
 def conectar_db():
-  return st.connection("postgresql", type="sql")
+  return st.connection(
+      "postgresql", type="sql", dialect="postgresql+psycopg2"
+  )
 
 
 # --- CONEXIÓN A SUPABASE (STORAGE) ---
