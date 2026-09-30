@@ -3,16 +3,17 @@ from io import BytesIO
 import pandas as pd
 from PIL import Image
 import streamlit as st
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 from supabase import create_client
 
 
-# --- CONEXIÓN A SUPABASE (DB) ---
+# --- CONEXIÓN DIRECTA A SUPABASE (POSTGRESQL) ---
 def conectar_db():
-  return st.connection(
-      "postgresql", type="sql", dialect="postgresql+psycopg2"
-  )
-
+  # Leemos la URL desde los Secrets de Streamlit de forma directa
+  db_url = st.secrets["connections"]["postgresql"]["url"]
+  # Creamos el motor con el driver psycopg2 de forma explícita
+  engine = create_engine(db_url)
+  return engine
 
 # --- CONEXIÓN A SUPABASE (STORAGE) ---
 def conectar_supabase_storage():
