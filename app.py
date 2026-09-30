@@ -176,10 +176,11 @@ if menu == "Inventario Actual":
             for idx, (_, row) in enumerate(fila.iterrows()):
                 with cols[idx]:
                     with st.container(border=True):
-                        if pd.notna(row["foto_url"]) and row["foto_url"]:
-                            st.image(row["foto_url"], use_container_width=True)
-                        else:
-                            st.info("Sin foto disponible")
+                      url_foto = str(row["foto_url"]) if pd.notna(row["foto_url"]) else ""
+if url_foto.startswith("http"):
+    st.image(url_foto, use_container_width=True)
+else:
+    st.info("Sin foto disponible")
                         
                         st.markdown(f"<div class='product-title'>{row['nombre']}</div>", unsafe_allow_html=True)
                         st.markdown(f"<div class='product-info'>Cod: <b>{row['codigo_interno']}</b> | Cat: <b>{row['categoria']}</b></div>", unsafe_allow_html=True)
