@@ -164,6 +164,11 @@ if menu == "Inventario Actual":
 
     df_productos = pd.read_sql(query, engine)
 
+    # LIMPIEZA TOTAL DEL DATAFRAME: Forzar que ceros o nulos en foto_url sean cadenas vacías
+    if "foto_url" in df_productos.columns:
+        df_productos["foto_url"] = df_productos["foto_url"].fillna("").astype(str)
+        df_productos.loc[df_productos["foto_url"].isin(["0", "None", "nan", "NaN", "null"]), "foto_url"] = ""
+
     if df_productos.empty:
         st.info("No hay sandalias registradas.")
     else:
@@ -176,17 +181,11 @@ if menu == "Inventario Actual":
                 with cols[idx]:
                     with st.container(border=True):
                         
-                        # FILTRADO ESTRICTO DE URL (Evita que el 0 aparezca)
-                        url_foto = ""
-                        val_crudo = row.get("foto_url")
-                        
-                        if val_crudo is not None and pd.notna(val_crudo):
-                            str_val = str(val_crudo).strip()
-                            if str_val.startswith("http") and len(str_val) > 10 and str_val != "0":
-                                url_foto = str_val
+                        # Extracción segura de la URL ya limpia
+                        url_foto = row.get("foto_url", "").strip()
 
-                        # Renderizado condicional limpio
-                        if url_foto != "":
+                        # Renderizado condicional estricto
+                        if url_foto.startswith("http") and len(url_foto) > 10:
                             try:
                                 st.image(url_foto, use_container_width=True)
                             except Exception:
