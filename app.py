@@ -9,77 +9,35 @@ from supabase import create_client
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
-    page_title="Sistema de Ventas - Sandalias", 
-    page_icon="🩴", 
-    layout="wide"
+    page_title="Sistema de Ventas - Sandalias", layout="wide"
 )
 
-# --- ESTILO GRÁFICO AVANZADO (CSS PERSONALIZADO) ---
+# --- ESTILO VISUAL PERSONALIZADO (CSS) ---
 st.markdown("""
     <style>
-    /* Ocultar elementos predeterminados de Streamlit para limpiar la interfaz */
+    /* Ocultar el menú de hamburguesa y el pie de página predeterminado de Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
 
-    /* Fondo general y tipografía limpia */
-    .stApp {
-        background-color: #F8FAFC;
-        font-family: 'Inter', sans-serif;
+    /* Estilo general para los títulos */
+    h1, h2, h3 {
+        color: #1E3A8A; /* Azul corporativo oscuro */
+        font-family: 'Helvetica Neue', sans-serif;
     }
 
-    /* Estilo elegante para títulos principales */
-    h1 {
-        color: #0F172A;
-        font-weight: 800;
-        letter-spacing: -0.5px;
-    }
-    h2, h3 {
-        color: #1E293B;
-        font-weight: 700;
-    }
-
-    /* Tarjetas de productos y contenedores con sombra suave */
-    div.stContainer, div.stForm {
-        background-color: #FFFFFF;
-        border-radius: 12px;
-        padding: 1.2rem;
-        border: 1px solid #E2E8F0;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    }
-
-    /* Botones modernos con efecto hover y colores corporativos */
+    /* Estilo moderno para los botones principales */
     div.stButton > button {
         background-color: #2563EB;
         color: white;
         border-radius: 8px;
         border: none;
-        padding: 0.6rem 1.2rem;
-        font-weight: 600;
-        box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
-        transition: all 0.2s ease-in-out;
+        padding: 0.5rem 1rem;
+        font-weight: bold;
+        transition: all 0.3s ease;
     }
     div.stButton > button:hover {
         background-color: #1D4ED8;
-        box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
-        transform: translateY(-1px);
-    }
-
-    /* Estilo de los inputs y campos de texto */
-    div.stTextInput > div > div > input, div.stNumberInput > div > div > input, div.stSelectbox > div > div {
-        border-radius: 8px;
-        border: 1px solid #CBD5E1;
-    }
-
-    /* Barra lateral estilizada */
-    section[data-testid="stSidebar"] {
-        background-color: #0F172A;
-    }
-    section[data-testid="stSidebar"] .stMarkdown h1, 
-    section[data-testid="stSidebar"] .stMarkdown h2, 
-    section[data-testid="stSidebar"] .stMarkdown h3,
-    section[data-testid="stSidebar"] label {
-        color: #F8FAFC !important;
+        border-color: #1D4ED8;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -143,7 +101,7 @@ def subir_a_supabase(file_buffer, nombre_archivo, carpeta):
 
 # --- MENÚ DE NAVEGACIÓN ---
 st.title("🩴 Sistema de Control y Ventas - Sandalias")
-st.sidebar.title("Menú Principal")
+st.sidebar.title("Menú de Navegación")
 
 menu = st.sidebar.selectbox(
     "Seleccione una opción",
@@ -158,11 +116,11 @@ menu = st.sidebar.selectbox(
 )
 
 # -------------------------------------------------------------
-# 1. INVENTARIO ACTUAL (ESTILO TARJETAS / GRID MODERNO)
+# 1. INVENTARIO ACTUAL
 # -------------------------------------------------------------
 if menu == "Inventario Actual":
     engine = conectar_db()
-    st.header("📦 Catálogo e Inventario de Sandalias")
+    st.header("📦 Inventario y Modelos de Sandalias")
 
     busqueda_inv = st.text_input("🔍 Buscar sandalia por nombre o código:")
     if busqueda_inv:
@@ -173,24 +131,26 @@ if menu == "Inventario Actual":
     df_productos = pd.read_sql(query, engine)
 
     if df_productos.empty:
-        st.info("No hay sandalias registradas en el inventario.")
+        st.info("No hay sandalias registradas.")
     else:
-        # Mostramos los productos en una cuadrícula de 3 columnas estilo tienda online
-        cols = st.columns(3)
-        for index, row in df_productos.iterrows():
-            with cols[index % 3]:
-                with st.container():
-                    if pd.notna(row["foto_url"]) and row["foto_url"]:
-                        st.image(row["foto_url"], use_container_width=True)
-                    else:
-                        st.info("🩴 Sin imagen disponible")
-                    
-                    st.markdown(f"### {row['nombre']}")
-                    st.caption(f"Código: {row['codigo_interno']}")
-                    st.write(f"🏷️ **Cat:** {row['categoria']} | 📏 **Talla:** {row['talla']}")
-                    st.write(f"📦 **Stock:** `{row['stock']} un.`")
-                    st.markdown(f"💰 **Precio Venta:** S/ {row['precio_venta']:.2f}")
-                    st.write(f"📉 *Costo:* S/ {row['precio_compra']:.2f}")
+        for _, row in df_productos.iterrows():
+            cols = st.columns([1, 3])
+            with cols[0]:
+                if pd.notna(row["foto_url"]) and row["foto_url"]:
+                    st.image(row["foto_url"], width=120)
+                else:
+                    st.info("Sin foto")
+            with cols[1]:
+                st.subheader(f"{row['nombre']} (Código: {row['codigo_interno']})")
+                st.write(
+                    f"**Categoría:** {row['categoria']} | **Talla:** {row['talla']} |"
+                    f" **Stock:** {row['stock']} un."
+                )
+                st.write(
+                    f"**Precio Compra:** S/ {row['precio_compra']:.2f} | **Precio Venta:**"
+                    f" S/ {row['precio_venta']:.2f}"
+                )
+            st.divider()
 
 # -------------------------------------------------------------
 # 2. REGISTRAR PRODUCTO
