@@ -15,7 +15,6 @@ st.set_page_config(
 )
 
 # --- ESTILO VISUAL PERSONALIZADO (CSS) ---
-# (Sin ocultar la barra superior ni el toolbar para que todo funcione de forma nativa)
 st.markdown("""
     <style>
     /* Ocultar únicamente el pie de página predeterminado de Streamlit */
@@ -129,8 +128,8 @@ def subir_a_supabase(file_buffer, nombre_archivo, carpeta):
     except Exception as e:
         try:
             return supabase.storage.from_("archivos-chanclas").get_public_url(path)
-        except:
-            st.error(f"Error al subir imagen: {e}")
+        except Exception as err:
+            st.error(f"Error al subir imagen: {err}")
             return None
 
 
@@ -176,11 +175,11 @@ if menu == "Inventario Actual":
             for idx, (_, row) in enumerate(fila.iterrows()):
                 with cols[idx]:
                     with st.container(border=True):
-                      url_foto = str(row["foto_url"]) if pd.notna(row["foto_url"]) else ""
-if url_foto.startswith("http"):
-    st.image(url_foto, use_container_width=True)
-else:
-    st.info("Sin foto disponible")
+                        url_foto = str(row["foto_url"]) if pd.notna(row["foto_url"]) else ""
+                        if url_foto.startswith("http"):
+                            st.image(url_foto, use_container_width=True)
+                        else:
+                            st.info("Sin foto disponible")
                         
                         st.markdown(f"<div class='product-title'>{row['nombre']}</div>", unsafe_allow_html=True)
                         st.markdown(f"<div class='product-info'>Cod: <b>{row['codigo_interno']}</b> | Cat: <b>{row['categoria']}</b></div>", unsafe_allow_html=True)
