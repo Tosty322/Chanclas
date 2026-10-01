@@ -282,7 +282,6 @@ elif menu == "Registrar Modelo":
             with col_und:
                 stock_unidades_sueltas = st.number_input("Unidades sueltas", min_value=0, max_value=11, value=0, step=1)
             
-            # Conversión automática a unidades totales
             stock_inicial_unidades = float((stock_docenas * 12) + stock_unidades_sueltas)
             st.info(f"💡 Total equivalente a registrar: **{stock_docenas} doc. y {stock_unidades_sueltas} un.** (**{int(stock_inicial_unidades)} unidades** en total)")
 
@@ -411,7 +410,6 @@ elif menu == "Registrar Venta (POS)":
             total_original = df_carrito["subtotal"].sum()
             st.markdown(f"### Total General a Cobrar: **S/ {total_original:.2f}**")
 
-            # --- OPCIONES DE COMPROBANTE Y PAGO ---
             col_p1, col_p2, col_p3 = st.columns(3)
             with col_p1:
                 tipo_comprobante = st.selectbox("Tipo de Comprobante", ["Boleta", "Factura", "Nota de Venta"])
@@ -445,7 +443,6 @@ elif menu == "Registrar Venta (POS)":
                     try:
                         fecha_venta = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         with engine.begin() as conn:
-                            # Asegurar columnas de pago si la tabla ya existía
                             conn.execute(text("""
                                 DO $$ 
                                 BEGIN 
@@ -604,13 +601,11 @@ elif menu == "Reporte Diario de Ventas":
     st.header("📅 Reporte Diario y Control de Flujo de Dinero")
     engine = conectar_db()
 
-    # Selector de fecha interactivo
     fecha_seleccionada = st.date_input("Seleccione la fecha a consultar", value=datetime.now().date())
     fecha_str = fecha_seleccionada.strftime("%Y-%m-%d")
 
     try:
         with engine.begin() as conn:
-            # 1. Asegurar que la tabla ventas tenga la columna de tarjeta
             conn.execute(text("""
                 DO $$ 
                 BEGIN 
@@ -620,7 +615,6 @@ elif menu == "Reporte Diario de Ventas":
                 END $$;
             """))
 
-            # 2. Asegurar que la tabla gastos exista y tenga la columna metodo_pago
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS gastos (
                     id SERIAL PRIMARY KEY,
@@ -641,7 +635,6 @@ elif menu == "Reporte Diario de Ventas":
                 END $$;
             """))
 
-        # 3. Consultar ventas de la fecha seleccionada
         query_dia = text("""
             SELECT id, fecha_hora, total, metodo_pago, 
                    COALESCE(monto_efectivo, 0) AS monto_efectivo, 
@@ -654,7 +647,6 @@ elif menu == "Reporte Diario de Ventas":
         """)
         df_dia = pd.read_sql(query_dia, engine, params={"f_sel": fecha_str})
 
-        # 4. Consultar gastos de la fecha seleccionada
         query_gastos_dia = text("""
             SELECT categoria, nota, COALESCE(metodo_pago, 'Efectivo') AS metodo_pago, importe
             FROM gastos
@@ -665,7 +657,6 @@ elif menu == "Reporte Diario de Ventas":
 
         st.markdown(f"### 📈 Resumen Financiero del Día: **{fecha_seleccionada.strftime('%d/%m/%Y')}**")
 
-        # --- INGRESOS ---
         ing_efectivo = df_dia["monto_efectivo"].sum() if not df_dia.empty else 0.0
         ing_yape = df_dia["monto_yape"].sum() if not df_dia.empty else 0.0
         ing_tarjeta = df_dia["monto_tarjeta"].sum() if not df_dia.empty else 0.0
@@ -682,7 +673,6 @@ elif menu == "Reporte Diario de Ventas":
         with col_m4:
             st.metric(label="💰 Total Ingresos", value=f"S/ {total_ingresos:.2f}")
 
-        # --- GASTOS POR MÉTODO DE PAGO ---
         if not df_gastos_dia.empty and "metodo_pago" in df_gastos_dia.columns:
             gasto_efectivo = df_gastos_dia[df_gastos_dia["metodo_pago"] == "Efectivo"]["importe"].sum()
             gasto_yape = df_gastos_dia[df_gastos_dia["metodo_pago"] == "Yape / Plin"]["importe"].sum()
@@ -707,7 +697,6 @@ elif menu == "Reporte Diario de Ventas":
 
         st.divider()
 
-        # --- CONTROL DE FLUJO DE DINERO (NETO EN CAJA/CUENTAS) ---
         neto_efectivo = ing_efectivo - gasto_efectivo
         neto_yape = ing_yape - gasto_yape
         neto_tarjeta = ing_tarjeta - gasto_tarjeta
@@ -726,7 +715,6 @@ elif menu == "Reporte Diario de Ventas":
 
         st.divider()
 
-        # --- DETALLES DE TABLAS ---
         col_t1, col_t2 = st.columns(2)
         with col_t1:
             st.markdown("#### 📝 Ventas del Día")
@@ -790,7 +778,6 @@ elif menu == "Registrar Gasto":
                 fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 
                 with engine.begin() as conn:
-                    # Crear tabla de gastos automáticamente si no existe con metodo_pago
                     conn.execute(text("""
                         CREATE TABLE IF NOT EXISTS gastos (
                             id SERIAL PRIMARY KEY,
@@ -802,7 +789,6 @@ elif menu == "Registrar Gasto":
                         )
                     """))
                     
-                    # Asegurar la columna si la tabla ya existía sin ella
                     conn.execute(text("""
                         DO $$ 
                         BEGIN 
@@ -829,7 +815,6 @@ elif menu == "Registrar Gasto":
             except Exception as e:
                 st.error(f"Error al registrar el gasto: {e}")
 
-    # Mostrar historial reciente de gastos debajo
     st.divider()
     st.subheader("📋 Historial de Gastos Recientes")
     try:
@@ -873,12 +858,16 @@ elif menu == "Reposición de Mercadería":
             df_reposicion["opcion_rep"] = df_reposicion["nombre"] + " [Talla: " + df_reposicion["talla"] + "] - Stock Actual: " + df_reposicion["stock_formateado"]
             prod_a_reponer = st.selectbox("Selecciona el modelo que llegó del proveedor:", df_reposicion["opcion_rep"])
             
-            st.markdown("<b>📦 Cuánto ingresa (Ingrese el total de unidades, ej: 30):</b>", unsafe_allow_html=True)
-            total_unidades_ingreso = st.number_input("Cantidad total de unidades que ingresan", min_value=0, value=12, step=1)
+            st.markdown("<b>📦 Cuánto ingresa (Docenas y Unidades):</b>", unsafe_allow_html=True)
+            col_doc_rep, col_und_rep = st.columns(2)
+            with col_doc_rep:
+                rep_docenas = st.number_input("Docenas que ingresan", min_value=0, value=1, step=1)
+            with col_und_rep:
+                rep_unidades_sueltas = st.number_input("Unidades sueltas que ingresan", min_value=0, max_value=11, value=0, step=1)
             
-            doc_ing_prev = total_unidades_ingreso // 12
-            und_ing_prev = total_unidades_ingreso % 12
-            st.info(f"💡 Equivale a: **{doc_ing_prev} docenas y {und_ing_prev} unidades**")
+            # Conversión automática a unidades totales para la reposición
+            total_unidades_ingreso = float((rep_docenas * 12) + rep_unidades_sueltas)
+            st.info(f"💡 Total equivalente a sumar: **{rep_docenas} doc. y {rep_unidades_sueltas} un.** (**{int(total_unidades_ingreso)} unidades** en total)")
             
             btn_reponer = st.form_submit_button("Actualizar y Sumar al Stock")
 
