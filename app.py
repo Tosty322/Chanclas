@@ -385,7 +385,15 @@ elif menu == "Registrar Venta (POS)":
             total_original = df_carrito["subtotal"].sum()
             st.markdown(f"### Total General a Cobrar: **S/ {total_original:.2f}**")
 
-            metodo_pago = st.selectbox("Método de pago", ["Efectivo", "Yape / Plin", "Tarjeta"])
+            # --- OPCIONES DE COMPROBANTE Y PAGO ---
+            col_p1, col_p2, col_p3 = st.columns(3)
+            with col_p1:
+                tipo_comprobante = st.selectbox("Tipo de Comprobante", ["Boleta", "Factura", "Nota de Venta"])
+            with col_p2:
+                numero_comprobante = st.text_input("N° de Talonario / Comprobante", placeholder="Ej: B001-00123")
+            with col_p3:
+                metodo_pago = st.selectbox("Método de pago", ["Efectivo", "Yape / Plin", "Tarjeta"])
+
             monto_yape = 0.0
             monto_efectivo = 0.0
             if metodo_pago == "Yape / Plin":
@@ -410,13 +418,14 @@ elif menu == "Registrar Venta (POS)":
                         with engine.begin() as conn:
                             res = conn.execute(
                                 text("""
-                                    INSERT INTO ventas (fecha_hora, total, metodo_pago, monto_yape, monto_efectivo, boleta_url)
-                                    VALUES (:f_h, :tot, :m_p, :m_y, :m_e, :b_url)
+                                    INSERT INTO ventas (fecha_hora, total, metodo_pago, monto_yape, monto_efectivo, boleta_url, tipo_comprobante, numero_comprobante)
+                                    VALUES (:f_h, :tot, :m_p, :m_y, :m_e, :b_url, :t_comp, :n_comp)
                                     RETURNING id
                                 """),
                                 dict(
                                     f_h=fecha_venta, tot=float(total_original), m_p=metodo_pago,
                                     m_y=float(monto_yape), m_e=float(monto_efectivo), b_url=boleta_url,
+                                    t_comp=tipo_comprobante, n_comp=numero_comprobante,
                                 ),
                             )
                             venta_id = res.fetchone()[0]
@@ -437,7 +446,7 @@ elif menu == "Registrar Venta (POS)":
                                     dict(cant=float(item["cantidad_unidades"]), p_id=int(item["id"])),
                                 )
 
-                        st.success(f"¡Venta registrada con éxito! N° #{venta_id:04d}")
+                        st.success(f"¡Venta registrada con éxito! Comprobante: {tipo_comprobante} N° {numero_comprobante}")
                         st.session_state.carrito_chanclas = []
                         st.rerun()
                     except Exception as e:
@@ -455,8 +464,10 @@ elif menu == "Historial de Ventas":
     engine = conectar_db()
     query_hist = """
         SELECT 
-            v.id AS n_boleta,
+            v.id AS id_interno,
             v.fecha_hora,
+            v.tipo_comprobante,
+            v.numero_comprobante,
             p.nombre AS modelo,
             p.talla,
             dv.cantidad AS docenas_vendidas,
@@ -474,32 +485,31 @@ elif menu == "Historial de Ventas":
     if df_hist.empty:
         st.info("No hay ventas registradas.")
     else:
-        df_hist["n_boleta_fmt"] = df_hist["n_boleta"].apply(lambda x: f"#{int(x):04d}")
+        df_hist["tipo_comprobante"] = df_hist["tipo_comprobante"].fillna("Nota de Venta")
+        df_hist["numero_comprobante"] = df_hist["numero_comprobante"].fillna("S/N")
         
-        # Transformamos la columna boleta_url para que aparezca como texto de enlace "Ver boleta"
         def formatear_enlace_boleta(url):
             if pd.notna(url) and str(url).strip().startswith("http"):
                 return f"[Ver boleta]({url})"
-            return "Sin comprobante"
+            return "Sin foto"
 
         df_hist["comprobante"] = df_hist["boleta_url"].apply(formatear_enlace_boleta)
         
         df_hist_display = df_hist[[
-            "n_boleta_fmt", "fecha_hora", "modelo", "talla", 
+            "tipo_comprobante", "numero_comprobante", "fecha_hora", "modelo", "talla", 
             "docenas_vendidas", "precio_docena", "subtotal", "metodo_pago", "comprobante"
         ]].copy()
         
         df_hist_display.columns = [
-            "N° Boleta", "Fecha y Hora", "Modelo", "Talla", 
-            "Docenas Vendidas", "Precio x Docena (S/)", "Subtotal (S/)", "Método de Pago", "Comprobante"
+            "Tipo", "N° Talonario", "Fecha y Hora", "Modelo", "Talla", 
+            "Docenas", "Precio x Doc. (S/)", "Subtotal (S/)", "Pago", "Foto"
         ]
         
-        # Mostramos la tabla interactiva que incluye el enlace clickeable "Ver boleta" en cada fila
         st.dataframe(
             df_hist_display, 
             use_container_width=True,
             column_config={
-                "Comprobante": st.column_config.LinkColumn("Comprobante", display_text="Ver boleta")
+                "Foto": st.column_config.LinkColumn("Foto", display_text="Ver boleta")
             }
         )
 
