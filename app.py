@@ -1,7 +1,7 @@
 from datetime import datetime
 from io import BytesIO
 import pandas as pd
-from PIL import Image
+from PIL import Image, ImageEnhance
 import streamlit as st
 from sqlalchemy import create_engine, text
 from supabase import create_client
@@ -100,7 +100,7 @@ def conectar_supabase_storage():
         return None
 
 
-# --- COMPRESIÓN DE IMÁGENES (Límite máx. aprox. 80 KB) ---
+# --- COMPRESIÓN DE IMÁGENES PARA PRODUCTOS (Inventario) ---
 def comprimir_imagen(imagen_subida, max_ancho=600, calidad=65):
     img = Image.open(imagen_subida)
     if img.mode in ("RGBA", "P"):
@@ -117,6 +117,36 @@ def comprimir_imagen(imagen_subida, max_ancho=600, calidad=65):
     if buffer.getbuffer().nbytes > 80 * 1024:
         buffer = BytesIO()
         img.save(buffer, format="JPEG", quality=50, optimize=True)
+
+    buffer.seek(0)
+    return buffer
+
+
+# --- PROCESAMIENTO Y COMPRESIÓN DE BOLETAS (Escala de grises + Contraste alto) ---
+def procesar_imagen_boleta(imagen_subida, max_ancho=800, factor_contraste=1.8):
+    """
+    Convierte la boleta a escala de grises, aumenta el contraste para oscurecer
+    el texto y blanquear el fondo, y reduce su peso para optimizar almacenamiento.
+    """
+    img = Image.open(imagen_subida)
+    
+    if img.mode in ("RGBA", "P"):
+        img = img.convert("RGB")
+
+    if img.width > max_ancho:
+        proporcion = max_ancho / img.width
+        nuevo_alto = int(img.height * proporcion)
+        img = img.resize((max_ancho, nuevo_alto), Image.Resampling.LANCZOS)
+
+    # 1. Convertir a escala de grises
+    img_gris = img.convert("L")
+
+    # 2. Aumentar el contraste para limpiar el fondo y oscurecer la letra
+    enhancer = ImageEnhance.Contrast(img_gris)
+    img_contraste = enhancer.enhance(factor_contraste)
+
+    buffer = BytesIO()
+    img_contraste.save(buffer, format="JPEG", quality=60, optimize=True)
 
     buffer.seek(0)
     return buffer
@@ -453,8 +483,9 @@ elif menu == "Registrar Venta (POS)":
                 if st.button("✅ Confirmar Venta"):
                     boleta_url = ""
                     if boleta_subida is not None:
-                        with st.spinner("Subiendo comprobante..."):
-                            img_comp = comprimir_imagen(boleta_subida)
+                        with st.spinner("Procesando y subiendo comprobante..."):
+                            # SE CAMBIÓ A LA FUNCIÓN DE ESCALA DE GRISES Y CONTRASTE
+                            img_comp = procesar_imagen_boleta(boleta_subida)
                             nombre_bol = f"boleta_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
                             boleta_url = subir_a_supabase(img_comp, nombre_bol, "boletas")
 
