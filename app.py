@@ -434,137 +434,149 @@ elif menu == "Registrar Venta (POS)":
 
         if st.session_state.carrito_chanclas:
             st.subheader("🛍 Carrito Actual")
-            df_carrito = pd.DataFrame(st.session_state.carrito_chanclas)
             
-            df_carrito_display = df_carrito[["nombre", "cantidad_doc", "precio_docena", "subtotal"]].copy()
-            df_carrito_display.columns = ["Modelo", "Docenas Vendidas (Fracción)", "Precio x Docena (S/)", "Importe (S/)"]
-            st.dataframe(df_carrito_display, use_container_width=True)
+            indices_a_borrar = []
+            for i, item in enumerate(st.session_state.carrito_chanclas):
+                c_item1, c_item2, c_item3, c_item4, c_item5 = st.columns([2.5, 1.0, 1.0, 1.2, 0.6])
+                c_item1.write(f"**{item['nombre']}**")
+                c_item2.write(f"{item['cantidad_doc']} doc.")
+                c_item3.write(f"S/ {item['precio_docena']:.2f}")
+                c_item4.write(f"**S/ {item['subtotal']:.2f}**")
+                if c_item5.button("🗑️", key=f"del_cart_{i}"):
+                    indices_a_borrar.append(i)
 
-            total_original = df_carrito["subtotal"].sum()
-            st.markdown(f"### Total General a Cobrar: **S/ {total_original:.2f}**")
+            if indices_a_borrar:
+                for idx in sorted(indices_a_borrar, reverse=True):
+                    st.session_state.carrito_chanclas.pop(idx)
+                st.rerun()
 
-            col_p1, col_p2, col_p3 = st.columns(3)
-            with col_p1:
-                tipo_comprobante = st.selectbox("Tipo de Comprobante", ["Boleta", "Factura", "Nota de Venta"])
-            with col_p2:
-                numero_comprobante = st.text_input("N° de Talonario / Comprobante", placeholder="Ej: B001-00123")
-            with col_p3:
-                metodo_pago = st.selectbox(
-                    "Método de pago", 
-                    [
-                        "Efectivo", 
-                        "Yape / Plin", 
-                        "Efectivo y Yape/Plin (Combinado)", 
-                        "Crédito", 
-                        "Crédito y Yape/Plin", 
-                        "Crédito y Efectivo"
-                    ]
-                )
+            if st.session_state.carrito_chanclas:
+                df_carrito = pd.DataFrame(st.session_state.carrito_chanclas)
+                total_original = df_carrito["subtotal"].sum()
+                st.markdown(f"### Total General a Cobrar: **S/ {total_original:.2f}**")
 
-            monto_efectivo = 0.0
-            monto_yape = 0.0
-            monto_credito = 0.0
+                col_p1, col_p2, col_p3 = st.columns(3)
+                with col_p1:
+                    tipo_comprobante = st.selectbox("Tipo de Comprobante", ["Boleta", "Factura", "Nota de Venta"])
+                with col_p2:
+                    numero_comprobante = st.text_input("N° de Talonario / Comprobante", placeholder="Ej: B001-00123")
+                with col_p3:
+                    metodo_pago = st.selectbox(
+                        "Método de pago", 
+                        [
+                            "Efectivo", 
+                            "Yape / Plin", 
+                            "Efectivo y Yape/Plin (Combinado)", 
+                            "Crédito", 
+                            "Crédito y Yape/Plin", 
+                            "Crédito y Efectivo"
+                        ]
+                    )
 
-            if metodo_pago == "Efectivo":
-                monto_efectivo = total_original
-            elif metodo_pago == "Yape / Plin":
-                monto_yape = total_original
-            elif metodo_pago == "Crédito":
-                monto_credito = total_original
-            elif metodo_pago == "Efectivo y Yape/Plin (Combinado)":
-                st.markdown("#### 🔀 Detalle de Combinación")
-                col_m1, col_m2 = st.columns(2)
-                with col_m1:
-                    monto_efectivo = st.number_input("Monto en Efectivo (S/)", min_value=0.0, max_value=float(total_original), value=float(total_original)/2, format="%.2f")
-                with col_m2:
-                    monto_yape = round(total_original - monto_efectivo, 2)
-                    st.metric("Monto en Yape / Plin (Automático)", value=f"S/ {monto_yape:.2f}")
-            elif metodo_pago == "Crédito y Yape/Plin":
-                st.markdown("#### 🔀 Detalle de Crédito + Yape/Plin")
-                col_m1, col_m2 = st.columns(2)
-                with col_m1:
-                    monto_yape = st.number_input("Monto pagado por Yape/Plin (S/)", min_value=0.0, max_value=float(total_original), value=0.0, format="%.2f")
-                with col_m2:
-                    monto_credito = round(total_original - monto_yape, 2)
-                    st.metric("Monto restante al Crédito (Automático)", value=f"S/ {monto_credito:.2f}")
-            elif metodo_pago == "Crédito y Efectivo":
-                st.markdown("#### 🔀 Detalle de Crédito + Efectivo")
-                col_m1, col_m2 = st.columns(2)
-                with col_m1:
-                    monto_efectivo = st.number_input("Monto pagado en Efectivo (S/)", min_value=0.0, max_value=float(total_original), value=0.0, format="%.2f")
-                with col_m2:
-                    monto_credito = round(total_original - monto_efectivo, 2)
-                    st.metric("Monto restante al Crédito (Automático)", value=f"S/ {monto_credito:.2f}")
+                monto_efectivo = 0.0
+                monto_yape = 0.0
+                monto_credito = 0.0
 
-            boleta_subida = st.file_uploader("Foto de la Boleta / Comprobante (Opcional)", type=["jpg", "jpeg", "png", "webp"])
+                if metodo_pago == "Efectivo":
+                    monto_efectivo = total_original
+                elif metodo_pago == "Yape / Plin":
+                    monto_yape = total_original
+                elif metodo_pago == "Crédito":
+                    monto_credito = total_original
+                elif metodo_pago == "Efectivo y Yape/Plin (Combinado)":
+                    st.markdown("#### 🔀 Detalle de Combinación")
+                    col_m1, col_m2 = st.columns(2)
+                    with col_m1:
+                        monto_efectivo = st.number_input("Monto en Efectivo (S/)", min_value=0.0, max_value=float(total_original), value=float(total_original)/2, format="%.2f")
+                    with col_m2:
+                        monto_yape = round(total_original - monto_efectivo, 2)
+                        st.metric("Monto en Yape / Plin (Automático)", value=f"S/ {monto_yape:.2f}")
+                elif metodo_pago == "Crédito y Yape/Plin":
+                    st.markdown("#### 🔀 Detalle de Crédito + Yape/Plin")
+                    col_m1, col_m2 = st.columns(2)
+                    with col_m1:
+                        monto_yape = st.number_input("Monto pagado por Yape/Plin (S/)", min_value=0.0, max_value=float(total_original), value=0.0, format="%.2f")
+                    with col_m2:
+                        monto_credito = round(total_original - monto_yape, 2)
+                        st.metric("Monto restante al Crédito (Automático)", value=f"S/ {monto_credito:.2f}")
+                elif metodo_pago == "Crédito y Efectivo":
+                    st.markdown("#### 🔀 Detalle de Crédito + Efectivo")
+                    col_m1, col_m2 = st.columns(2)
+                    with col_m1:
+                        monto_efectivo = st.number_input("Monto pagado en Efectivo (S/)", min_value=0.0, max_value=float(total_original), value=0.0, format="%.2f")
+                    with col_m2:
+                        monto_credito = round(total_original - monto_efectivo, 2)
+                        st.metric("Monto restante al Crédito (Automático)", value=f"S/ {monto_credito:.2f}")
 
-            col_btn1, col_btn2 = st.columns(2)
-            with col_btn1:
-                if st.button("✅ Confirmar Venta"):
-                    boleta_url = ""
-                    if boleta_subida is not None:
-                        with st.spinner("Procesando y subiendo comprobante..."):
-                            img_comp = procesar_imagen_boleta(boleta_subida)
-                            nombre_bol = f"boleta_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
-                            boleta_url = subir_a_supabase(img_comp, nombre_bol, "boletas")
+                boleta_subida = st.file_uploader("Foto de la Boleta / Comprobante (Opcional)", type=["jpg", "jpeg", "png", "webp"])
 
-                    try:
-                        fecha_venta = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        with engine.begin() as conn:
-                            conn.execute(text("""
-                                DO $$ 
-                                BEGIN 
-                                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ventas' and column_name='monto_credito') THEN
-                                        ALTER TABLE ventas ADD COLUMN monto_credito NUMERIC(10,2) DEFAULT 0;
-                                    END IF;
-                                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ventas' and column_name='monto_yape') THEN
-                                        ALTER TABLE ventas ADD COLUMN monto_yape NUMERIC(10,2) DEFAULT 0;
-                                    END IF;
-                                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ventas' and column_name='monto_efectivo') THEN
-                                        ALTER TABLE ventas ADD COLUMN monto_efectivo NUMERIC(10,2) DEFAULT 0;
-                                    END IF;
-                                END $$;
-                            """))
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    if st.button("✅ Confirmar Venta"):
+                        boleta_url = ""
+                        if boleta_subida is not None:
+                            with st.spinner("Procesando y subiendo comprobante..."):
+                                img_comp = procesar_imagen_boleta(boleta_subida)
+                                nombre_bol = f"boleta_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+                                boleta_url = subir_a_supabase(img_comp, nombre_bol, "boletas")
 
-                            res = conn.execute(
-                                text("""
-                                    INSERT INTO ventas (fecha_hora, total, metodo_pago, monto_yape, monto_efectivo, monto_credito, boleta_url, tipo_comprobante, numero_comprobante)
-                                    VALUES (:f_h, :tot, :m_p, :m_y, :m_e, :m_c, :b_url, :t_comp, :n_comp)
-                                    RETURNING id
-                                """),
-                                dict(
-                                    f_h=fecha_venta, tot=float(total_original), m_p=metodo_pago,
-                                    m_y=float(monto_yape), m_e=float(monto_efectivo), m_c=float(monto_credito),
-                                    b_url=boleta_url, t_comp=tipo_comprobante, n_comp=numero_comprobante,
-                                ),
-                            )
-                            venta_id = res.fetchone()[0]
+                        try:
+                            fecha_venta = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            with engine.begin() as conn:
+                                conn.execute(text("""
+                                    DO $$ 
+                                    BEGIN 
+                                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ventas' and column_name='monto_credito') THEN
+                                            ALTER TABLE ventas ADD COLUMN monto_credito NUMERIC(10,2) DEFAULT 0;
+                                        END IF;
+                                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ventas' and column_name='monto_yape') THEN
+                                            ALTER TABLE ventas ADD COLUMN monto_yape NUMERIC(10,2) DEFAULT 0;
+                                        END IF;
+                                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ventas' and column_name='monto_efectivo') THEN
+                                            ALTER TABLE ventas ADD COLUMN monto_efectivo NUMERIC(10,2) DEFAULT 0;
+                                        END IF;
+                                    END $$;
+                                """))
 
-                            for item in st.session_state.carrito_chanclas:
-                                conn.execute(
+                                res = conn.execute(
                                     text("""
-                                        INSERT INTO detalle_ventas (venta_id, producto_id, cantidad, precio_unitario, subtotal)
-                                        VALUES (:v_id, :p_id, :cant, :p_u, :sub)
+                                        INSERT INTO ventas (fecha_hora, total, metodo_pago, monto_yape, monto_efectivo, monto_credito, boleta_url, tipo_comprobante, numero_comprobante)
+                                        VALUES (:f_h, :tot, :m_p, :m_y, :m_e, :m_c, :b_url, :t_comp, :n_comp)
+                                        RETURNING id
                                     """),
                                     dict(
-                                        v_id=int(venta_id), p_id=int(item["id"]), cant=float(item["cantidad_doc"]),
-                                        p_u=float(item["precio_docena"]), sub=float(item["subtotal"]),
+                                        f_h=fecha_venta, tot=float(total_original), m_p=metodo_pago,
+                                        m_y=float(monto_yape), m_e=float(monto_efectivo), m_c=float(monto_credito),
+                                        b_url=boleta_url, t_comp=tipo_comprobante, n_comp=numero_comprobante,
                                     ),
                                 )
-                                conn.execute(
-                                    text("UPDATE productos SET stock = stock - :cant WHERE id = :p_id"),
-                                    dict(cant=float(item["cantidad_unidades"]), p_id=int(item["id"])),
-                                )
+                                venta_id = res.fetchone()[0]
 
-                        st.success(f"¡Venta registrada con éxito! Comprobante: {tipo_comprobante} N° {numero_comprobante}")
+                                for item in st.session_state.carrito_chanclas:
+                                    conn.execute(
+                                        text("""
+                                            INSERT INTO detalle_ventas (venta_id, producto_id, cantidad, precio_unitario, subtotal)
+                                            VALUES (:v_id, :p_id, :cant, :p_u, :sub)
+                                        """),
+                                        dict(
+                                            v_id=int(venta_id), p_id=int(item["id"]), cant=float(item["cantidad_doc"]),
+                                            p_u=float(item["precio_docena"]), sub=float(item["subtotal"]),
+                                        ),
+                                    )
+                                    conn.execute(
+                                        text("UPDATE productos SET stock = stock - :cant WHERE id = :p_id"),
+                                        dict(cant=float(item["cantidad_unidades"]), p_id=int(item["id"])),
+                                    )
+
+                            st.success(f"¡Venta registrada con éxito! Comprobante: {tipo_comprobante} N° {numero_comprobante}")
+                            st.session_state.carrito_chanclas = []
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error al guardar venta: {e}")
+                with col_btn2:
+                    if st.button("🗑️ Vaciar Carrito"):
                         st.session_state.carrito_chanclas = []
                         st.rerun()
-                    except Exception as e:
-                        st.error(f"Error al guardar venta: {e}")
-            with col_btn2:
-                if st.button("🗑️ Vaciar Carrito"):
-                    st.session_state.carrito_chanclas = []
-                    st.rerun()
 
 # -------------------------------------------------------------
 # 4. PENDIENTES A COBRAR
@@ -584,7 +596,6 @@ elif menu == "Pendientes a Cobrar":
                 END $$;
             """))
 
-        # Mostrar selector de filtro: Solo pendientes o ver todo el historial de créditos
         filtro_estado = st.radio("Mostrar:", ["Solo deudas pendientes (Por cobrar > 0)", "Ver todas (Incluyendo ya canceladas)"], horizontal=True)
 
         if filtro_estado == "Solo deudas pendientes (Por cobrar > 0)":
@@ -623,12 +634,11 @@ elif menu == "Pendientes a Cobrar":
                 saldo_pendiente = float(row['monto_credito'])
                 id_venta = int(row['id'])
 
-                # Definir color del borde y estado visual según si se debe o ya se canceló
                 if saldo_pendiente > 0:
-                    color_borde = "#DC2626"  # Rojo para pendiente
+                    color_borde = "#DC2626"
                     estado_texto = f"<span style='color: #DC2626; font-weight: bold;'>PENDIENTE: S/ {saldo_pendiente:.2f}</span>"
                 else:
-                    color_borde = "#10B981"  # Verde para cancelado
+                    color_borde = "#10B981"
                     estado_texto = f"<span style='color: #10B981; font-weight: bold;'>✅ CANCELADO TOTAL</span>"
 
                 with st.container(border=True):
@@ -656,7 +666,6 @@ elif menu == "Pendientes a Cobrar":
                         else:
                             st.markdown(f"{estilo}<b>Comprobante:</b><br><span style='color: #9CA3AF;'>No adjunta</span>{cierre}", unsafe_allow_html=True)
 
-                    # Sección desplegable para abonar o cancelar la deuda si aún hay saldo pendiente
                     if saldo_pendiente > 0:
                         with st.expander(f"💳 Registrar Abono o Cancelación para Venta #{id_venta} (Saldo: S/ {saldo_pendiente:.2f})"):
                             with st.form(f"form_abono_{id_venta}"):
