@@ -275,12 +275,16 @@ elif menu == "Registrar Modelo":
         with col2:
             talla = st.text_input("Talla (Ej: 36, 37, 38 o Rango 36-39)")
             
-            st.markdown("<b>📦 Stock Inicial (Ingrese el total de unidades sueltas):</b>", unsafe_allow_html=True)
-            stock_inicial_unidades = st.number_input("Cantidad total de unidades", min_value=0, value=12, step=1)
+            st.markdown("<b>📦 Stock Inicial (Docenas y Unidades):</b>", unsafe_allow_html=True)
+            col_doc, col_und = st.columns(2)
+            with col_doc:
+                stock_docenas = st.number_input("Docenas", min_value=0, value=1, step=1)
+            with col_und:
+                stock_unidades_sueltas = st.number_input("Unidades sueltas", min_value=0, max_value=11, value=0, step=1)
             
-            doc_prev = stock_inicial_unidades // 12
-            und_prev = stock_inicial_unidades % 12
-            st.info(f"💡 Equivale a: **{doc_prev} docenas y {und_prev} unidades**")
+            # Conversión automática a unidades totales
+            stock_inicial_unidades = float((stock_docenas * 12) + stock_unidades_sueltas)
+            st.info(f"💡 Total equivalente a registrar: **{stock_docenas} doc. y {stock_unidades_sueltas} un.** (**{int(stock_inicial_unidades)} unidades** en total)")
 
             precio_venta = st.number_input("Precio de Venta por Docena (S/)", min_value=0.0, format="%.2f")
             precio_compra = st.number_input("Precio de Compra / Costo por Docena (S/)", min_value=0.0, format="%.2f")
@@ -718,7 +722,7 @@ elif menu == "Reporte Diario de Ventas":
         with col_f3:
             st.metric(label="💳 Saldo Tarjeta", value=f"S/ {neto_tarjeta:.2f}", delta=f"S/ {neto_tarjeta:.2f}")
         with col_f4:
-            st.metric(label="⚖️️ Balance Neto Total", value=f"S/ {balance_neto:.2f}")
+            st.metric(label="⚖ Balance Neto Total", value=f"S/ {balance_neto:.2f}")
 
         st.divider()
 
