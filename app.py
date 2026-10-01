@@ -629,14 +629,17 @@ elif menu == "Reporte Diario de Ventas":
         """)
         df_dia = pd.read_sql(query_dia, engine, params={"f_sel": fecha_str})
 
-        # 2. Consultar gastos de la fecha seleccionada
-        query_gastos_dia = text("""
-            SELECT categoria, nota, importe
-            FROM gastos
-            WHERE DATE(fecha_hora) = :f_sel
-            ORDER BY id DESC
-        """)
-        df_gastos_dia = pd.read_sql(query_gastos_dia, engine, params={"f_sel": fecha_str})
+        # 2. Consultar gastos de la fecha seleccionada (con manejo seguro por si la tabla aún no existe)
+        try:
+            query_gastos_dia = text("""
+                SELECT categoria, nota, importe
+                FROM gastos
+                WHERE DATE(fecha_hora) = :f_sel
+                ORDER BY id DESC
+            """)
+            df_gastos_dia = pd.read_sql(query_gastos_dia, engine, params={"f_sel": fecha_str})
+        except Exception:
+            df_gastos_dia = pd.DataFrame(columns=["categoria", "nota", "importe"])
 
         st.markdown(f"### 📈 Resumen Financiero del Día: **{fecha_seleccionada.strftime('%d/%m/%Y')}**")
 
@@ -664,13 +667,13 @@ elif menu == "Reporte Diario de Ventas":
         st.subheader("💸 Gastos Operativos del Día")
         
         if df_gastos_dia.empty:
-            st.info("No se registraron gastos en esta fecha.")
+            st.info("No se registraron gastos en esta fecha o la tabla de gastos aún no ha sido creada (puedes registrar uno en el menú 'Registrar Gasto').")
             gastos_por_categoria = pd.Series(dtype=float)
         else:
             # Agrupar gastos por categoría para mostrarlos por separado
             gastos_por_categoria = df_gastos_dia.groupby("categoria")["importe"].sum()
             
-            # Mostrar métricas o tarjetas ordenadas por categoría de gasto
+            # Mostrar métricas ordenadas por categoría de gasto
             cols_gastos = st.columns(min(len(gastos_por_categoria), 4) if len(gastos_por_categoria) > 0 else 1)
             for i, (cat, imp) in enumerate(gastos_por_categoria.items()):
                 with cols_gastos[i % len(cols_gastos)]:
@@ -694,7 +697,6 @@ elif menu == "Reporte Diario de Ventas":
         with col_b2:
             st.metric(label="➖ Total Gastos", value=f"S/ {total_general_gastos:.2f}")
         with col_b3:
-            color_balance = "normal" if balance_total >= 0 else "inverse"
             st.metric(label="🎯 Balance Neto (Ganancia / Pérdida)", value=f"S/ {balance_total:.2f}", delta=f"S/ {balance_total:.2f}")
 
         st.divider()
