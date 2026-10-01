@@ -511,7 +511,6 @@ elif menu == "Registrar Venta (POS)":
                     try:
                         fecha_venta = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         with engine.begin() as conn:
-                            # Asegurar columnas necesarias en la tabla ventas
                             conn.execute(text("""
                                 DO $$ 
                                 BEGIN 
@@ -571,7 +570,7 @@ elif menu == "Registrar Venta (POS)":
 # 4. PENDIENTES A COBRAR
 # -------------------------------------------------------------
 elif menu == "Pendientes a Cobrar":
-    st.header("📋 Ventas Pendientes de Cobro (Créditos / Fiados)")
+    st.header("📋 Gestión de Cuentas por Cobrar (Créditos / Fiados)")
     engine = conectar_db()
 
     try:
@@ -585,53 +584,141 @@ elif menu == "Pendientes a Cobrar":
                 END $$;
             """))
 
-        query_pendientes = text("""
-            SELECT id, fecha_hora, tipo_comprobante, numero_comprobante, total, 
-                   COALESCE(monto_efectivo, 0) AS monto_efectivo, 
-                   COALESCE(monto_yape, 0) AS monto_yape, 
-                   COALESCE(monto_credito, 0) AS monto_credito, 
-                   metodo_pago, boleta_url
-            FROM ventas
-            WHERE COALESCE(monto_credito, 0) > 0
-            ORDER BY id DESC
-        """)
-        df_pendientes = pd.read_sql(query_pendientes, engine)
+        # Mostrar selector de filtro: Solo pendientes o ver todo el historial de créditos
+        filtro_estado = st.radio("Mostrar:", ["Solo deudas pendientes (Por cobrar > 0)", "Ver todas (Incluyendo ya canceladas)"], horizontal=True)
+
+        if filtro_estado == "Solo deudas pendientes (Por cobrar > 0)":
+            query_pendientes = text("""
+                SELECT id, fecha_hora, tipo_comprobante, numero_comprobante, total, 
+                       COALESCE(monto_efectivo, 0) AS monto_efectivo, 
+                       COALESCE(monto_yape, 0) AS monto_yape, 
+                       COALESCE(monto_credito, 0) AS monto_credito, 
+                       metodo_pago, boleta_url
+                FROM ventas
+                WHERE COALESCE(monto_credito, 0) > 0
+                ORDER BY id DESC
+            """)
+            df_pendientes = pd.read_sql(query_pendientes, engine)
+        else:
+            query_pendientes = text("""
+                SELECT id, fecha_hora, tipo_comprobante, numero_comprobante, total, 
+                       COALESCE(monto_efectivo, 0) AS monto_efectivo, 
+                       COALESCE(monto_yape, 0) AS monto_yape, 
+                       COALESCE(monto_credito, 0) AS monto_credito, 
+                       metodo_pago, boleta_url
+                FROM ventas
+                WHERE metodo_pago ILIKE '%crédito%' OR COALESCE(monto_credito, 0) > 0
+                ORDER BY id DESC
+            """)
+            df_pendientes = pd.read_sql(query_pendientes, engine)
 
         if df_pendientes.empty:
-            st.success("🎉 ¡Excelente! No hay cuentas pendientes por cobrar (créditos en cero).")
+            st.success("🎉 ¡Excelente! No hay cuentas pendientes por cobrar.")
         else:
             total_por_cobrar = df_pendientes["monto_credito"].sum()
             st.metric(label="💰 Deuda Total Acumulada por Cobrar", value=f"S/ {total_por_cobrar:.2f}")
             st.divider()
 
             for _, row in df_pendientes.iterrows():
+                saldo_pendiente = float(row['monto_credito'])
+                id_venta = int(row['id'])
+
+                # Definir color del borde y estado visual según si se debe o ya se canceló
+                if saldo_pendiente > 0:
+                    color_borde = "#DC2626"  # Rojo para pendiente
+                    estado_texto = f"<span style='color: #DC2626; font-weight: bold;'>PENDIENTE: S/ {saldo_pendiente:.2f}</span>"
+                else:
+                    color_borde = "#10B981"  # Verde para cancelado
+                    estado_texto = f"<span style='color: #10B981; font-weight: bold;'>✅ CANCELADO TOTAL</span>"
+
                 with st.container(border=True):
-                    cols = st.columns([1.2, 1.2, 1.5, 1.2, 1.2, 1.2, 1.2])
+                    cols = st.columns([1.1, 1.1, 1.4, 1.1, 1.1, 1.3, 1.1])
                     
-                    estilo = "<div style='font-size: 13px; line-height: 1.3; overflow-wrap: break-word;'>"
+                    estilo = "<div style='font-size: 12px; line-height: 1.3; overflow-wrap: break-word;'>"
                     cierre = "</div>"
 
                     with cols[0]:
-                        st.markdown(f"{estilo}<b>Fecha:</b><br>{row['fecha_hora']}{cierre}", unsafe_allow_html=True)
+                        st.markdown(f"{estilo}<b>ID/Fecha:</b><br>#{id_venta}<br>{row['fecha_hora']}{cierre}", unsafe_allow_html=True)
                     with cols[1]:
                         st.markdown(f"{estilo}<b>Comprobante:</b><br>{row['tipo_comprobante']}<br><b>N°:</b> {row['numero_comprobante'] or 'S/N'}{cierre}", unsafe_allow_html=True)
                     with cols[2]:
-                        st.markdown(f"{estilo}<b>Método Pago:</b><br>{row['metodo_pago']}{cierre}", unsafe_allow_html=True)
+                        st.markdown(f"{estilo}<b>Método Inicial:</b><br>{row['metodo_pago']}{cierre}", unsafe_allow_html=True)
                     with cols[3]:
                         st.markdown(f"{estilo}<b>Total Venta:</b><br>S/ {row['total']:.2f}{cierre}", unsafe_allow_html=True)
                     with cols[4]:
-                        st.markdown(f"{estilo}<b>Abonado:</b><br>S/ {(row['monto_efectivo'] + row['monto_yape']):.2f}{cierre}", unsafe_allow_html=True)
+                        st.markdown(f"{estilo}<b>Abonado Inicial:</b><br>S/ {(row['monto_efectivo'] + row['monto_yape']):.2f}{cierre}", unsafe_allow_html=True)
                     with cols[5]:
-                        st.markdown(f"{estilo}<b style='color: #DC2626;'>Pendiente:</b><br><span style='color: #DC2626; font-weight: bold;'>S/ {row['monto_credito']:.2f}</span>{cierre}", unsafe_allow_html=True)
+                        st.markdown(f"{estilo}<b>Estado Deuda:</b><br>{estado_texto}{cierre}", unsafe_allow_html=True)
                     with cols[6]:
                         url = str(row['boleta_url']).strip()
                         if url and url not in ["", "None", "nan", "NaN", "null", "0"] and url.startswith("http"):
-                            st.markdown(f"{estilo}<b>Boleta:</b><br><a href='{url}' target='_blank'>Ver foto</a>{cierre}", unsafe_allow_html=True)
+                            st.markdown(f"{estilo}<b>Comprobante:</b><br><a href='{url}' target='_blank'>Ver foto</a>{cierre}", unsafe_allow_html=True)
                         else:
-                            st.markdown(f"{estilo}<b>Boleta:</b><br><span style='color: #9CA3AF;'>No adjunta</span>{cierre}", unsafe_allow_html=True)
+                            st.markdown(f"{estilo}<b>Comprobante:</b><br><span style='color: #9CA3AF;'>No adjunta</span>{cierre}", unsafe_allow_html=True)
+
+                    # Sección desplegable para abonar o cancelar la deuda si aún hay saldo pendiente
+                    if saldo_pendiente > 0:
+                        with st.expander(f"💳 Registrar Abono o Cancelación para Venta #{id_venta} (Saldo: S/ {saldo_pendiente:.2f})"):
+                            with st.form(f"form_abono_{id_venta}"):
+                                col_ab1, col_ab2 = st.columns(2)
+                                with col_ab1:
+                                    monto_abono = st.number_input(
+                                        "Monto que abona / cancela (S/)", 
+                                        min_value=0.01, 
+                                        max_value=float(saldo_pendiente), 
+                                        value=float(saldo_pendiente), 
+                                        format="%.2f",
+                                        key=f"monto_abono_{id_venta}"
+                                    )
+                                with col_ab2:
+                                    metodo_abono = st.selectbox(
+                                        "Método con el que paga el abono", 
+                                        ["Efectivo", "Yape / Plin", "Efectivo y Yape/Plin (Combinado)"],
+                                        key=f"metodo_abono_{id_venta}"
+                                    )
+
+                                abono_efectivo = 0.0
+                                abono_yape = 0.0
+
+                                if metodo_abono == "Efectivo":
+                                    abono_efectivo = monto_abono
+                                elif metodo_abono == "Yape / Plin":
+                                    abono_yape = monto_abono
+                                elif metodo_abono == "Efectivo y Yape/Plin (Combinado)":
+                                    col_sub1, col_sub2 = st.columns(2)
+                                    with col_sub1:
+                                        abono_efectivo = st.number_input("Parte en Efectivo (S/)", min_value=0.0, max_value=float(monto_abono), value=float(monto_abono)/2, format="%.2f", key=f"ab_ef_{id_venta}")
+                                    with col_sub2:
+                                        abono_yape = round(monto_abono - abono_efectivo, 2)
+                                        st.metric("Parte en Yape / Plin", value=f"S/ {abono_yape:.2f}")
+
+                                btn_guardar_abono = st.form_submit_button("💾 Guardar Abono / Actualizar Saldo")
+
+                                if btn_guardar_abono:
+                                    try:
+                                        with engine.begin() as conn:
+                                            conn.execute(
+                                                text("""
+                                                    UPDATE ventas 
+                                                    SET monto_credito = monto_credito - :monto_pagado,
+                                                        monto_efectivo = monto_efectivo + :ab_ef,
+                                                        monto_yape = monto_yape + :ab_yp
+                                                    WHERE id = :v_id
+                                                """),
+                                                dict(
+                                                    monto_pagado=float(monto_abono),
+                                                    ab_ef=float(abono_efectivo),
+                                                    ab_yp=float(abono_yape),
+                                                    v_id=id_venta
+                                                )
+                                            )
+                                        st.success(f"✅ ¡Abono de S/ {monto_abono:.2f} registrado con éxito! El saldo se ha actualizado.")
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Error al registrar el abono: {e}")
 
     except Exception as e:
-        st.error(f"Error al cargar las ventas pendientes: {e}")
+        st.error(f"Error al cargar las cuentas pendientes: {e}")
 
 # -------------------------------------------------------------
 # 5. REPORTE DIARIO DE VENTAS
