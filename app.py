@@ -199,7 +199,6 @@ if menu == "Inventario Actual":
     if df_productos.empty:
         st.info("No hay modelos registrados.")
     else:
-        # Preparamos el DataFrame limpio para la descarga en CSV del inventario
         df_inv_csv = df_productos[[
             "codigo_interno", "nombre", "categoria", "origen", "talla", "stock", "precio_venta", "precio_compra", "apuntes", "foto_url"
         ]].copy()
@@ -400,7 +399,7 @@ elif menu == "Registrar Venta (POS)":
             df_carrito = pd.DataFrame(st.session_state.carrito_chanclas)
             
             df_carrito_display = df_carrito[["nombre", "cantidad_doc", "precio_docena", "subtotal"]].copy()
-            df_carrito_display.columns = ["Modelo", "Docenas Vendidas", "Precio x Docena (S/)", "Importe (S/)"]
+            df_carrito_display.columns = ["Modelo", "Docenas Vendidas (Fracción)", "Precio x Docena (S/)", "Importe (S/)"]
             st.dataframe(df_carrito_display, use_container_width=True)
 
             total_original = df_carrito["subtotal"].sum()
@@ -509,14 +508,27 @@ elif menu == "Historial de Ventas":
         df_hist["tipo_comprobante"] = df_hist["tipo_comprobante"].fillna("Nota de Venta")
         df_hist["numero_comprobante"] = df_hist["numero_comprobante"].fillna("S/N")
         
+        # Calculamos las docenas enteras y las unidades sueltas enteras a partir de las docenas vendidas
+        def calcular_docenas_enteras(val):
+            total_unidades = int(round(float(val) * 12))
+            return total_unidades // 12
+
+        def calcular_unidades_sueltas(val):
+            total_unidades = int(round(float(val) * 12))
+            return total_unidades % 12
+
+        df_hist["docenas_enteras"] = df_hist["docenas_vendidas"].apply(calcular_docenas_enteras)
+        df_hist["unidades_sueltas"] = df_hist["docenas_vendidas"].apply(calcular_unidades_sueltas)
+
+        # Preparamos el CSV incluyendo la fracción, docenas enteras y unidades
         df_csv = df_hist[[
             "tipo_comprobante", "numero_comprobante", "fecha_hora", "modelo", 
-            "talla", "docenas_vendidas", "precio_docena", "subtotal", "metodo_pago", "boleta_url"
+            "talla", "docenas_vendidas", "docenas_enteras", "unidades_sueltas", "precio_docena", "subtotal", "metodo_pago", "boleta_url"
         ]].copy()
         
         df_csv.columns = [
             "Tipo Comprobante", "N° Comprobante", "Fecha y Hora", "Modelo", 
-            "Talla", "Docenas Vendidas", "Precio x Docena (S/)", "Importe (S/)", "Método de Pago", "URL Comprobante"
+            "Talla", "Docenas (Fracción)", "Docenas Enteras", "Unidades Sueltas", "Precio x Docena (S/)", "Importe (S/)", "Método de Pago", "URL Comprobante"
         ]
         
         csv_data = df_csv.to_csv(index=False).encode('utf-8')
@@ -532,8 +544,13 @@ elif menu == "Historial de Ventas":
 
         for _, row in df_hist.iterrows():
             with st.container(border=True):
-                col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns([0.8, 0.8, 1.2, 1.6, 0.7, 0.8, 1.0, 1.0, 1.3])
+                # Ampliamos a 10 columnas para separar Fracción, Docenas enteras y Unidades enteras claramente
+                col1, col2, col3, col4, col5, col6, col7, col8, col9, col10 = st.columns([0.7, 0.7, 1.1, 1.5, 0.6, 0.7, 0.7, 0.9, 0.9, 1.2])
                 
+                doc_entera = int(row['docenas_enteras'])
+                und_suelta = int(row['unidades_sueltas'])
+                fraccion_doc = float(row['docenas_vendidas'])
+
                 with col1:
                     st.markdown(f"**Tipo:**<br>{row['tipo_comprobante']}", unsafe_allow_html=True)
                 with col2:
@@ -545,18 +562,24 @@ elif menu == "Historial de Ventas":
                 with col5:
                     st.markdown(f"**Talla:**<br>{row['talla']}", unsafe_allow_html=True)
                 with col6:
-                    st.markdown(f"**Docenas:**<br>{row['docenas_vendidas']}", unsafe_allow_html=True)
+                    st.markdown(f"**Doc. (Frac):**<br>{fraccion_doc:.3f}", unsafe_allow_html=True)
                 with col7:
-                    st.markdown(f"**Precio x Doc:**<br>S/ {row['precio_docena']:.2f}", unsafe_allow_html=True)
+                    st.markdown(f"**Docenas:**<br>{doc_entera}", unsafe_allow_html=True)
                 with col8:
-                    st.markdown(f"**Importe:**<br>S/ {row['subtotal']:.2f}", unsafe_allow_html=True)
+                    st.markdown(f"**Unidades:**<br>{und_suelta}", unsafe_allow_html=True)
                 with col9:
-                    st.markdown("**Comprobante:**")
-                    url = str(row['boleta_url']).strip()
-                    if url and url not in ["", "None", "nan", "NaN", "null", "0"] and url.startswith("http"):
-                        st.markdown(f"[Ver comprobante]({url})")
-                    else:
-                        st.markdown("<span style='color: #6B7280; font-size: 13px;'>No se adjuntó comprobante</span>", unsafe_allow_html=True)
+                    st.markdown(f"**Precio x Doc:**<br>S/ {row['precio_docena']:.2f}", unsafe_allow_html=True)
+                with col10:
+                    st.markdown(f"**Importe:**<br>S/ {row['subtotal']:.2f}", unsafe_allow_html=True)
+
+            # Fila adicional o sección pequeña dentro del contenedor para mostrar el comprobante de forma limpia
+            with st.container():
+                url = str(row['boleta_url']).strip()
+                if url and url not in ["", "None", "nan", "NaN", "null", "0"] and url.startswith("http"):
+                    st.markdown(f"📎 **Comprobante:** [Ver comprobante]({url})")
+                else:
+                    st.markdown("<span style='color: #6B7280; font-size: 13px;'>📎 <b>Comprobante:</b> No se adjuntó comprobante</span>", unsafe_allow_html=True)
+            st.divider()
 
 # -------------------------------------------------------------
 # 5. REPOSICIÓN DE MERCADERÍA
