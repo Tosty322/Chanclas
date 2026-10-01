@@ -353,7 +353,7 @@ elif menu == "Registrar Venta (POS)":
         subtotal_calculado = cantidad_docenas * precio_docena_actual
         unidades_equivalentes = int(round(cantidad_docenas * 12))
         
-        st.info(f"💡 **Resumen:** {cantidad_docenas} docena(s) equivalen a **{unidades_equivalentes} unidades** | Precio Docena: **S/ {precio_docena_actual:.2f}** | **Subtotal Parcial: S/ {subtotal_calculado:.2f}**")
+        st.info(f"💡 **Resumen:** {cantidad_docenas} docena(s) equivalen a **{unidades_equivalentes} unidades** | Precio Docena: **S/ {precio_docena_actual:.2f}** | **Importe (Subtotal): S/ {subtotal_calculado:.2f}**")
 
         if st.button("➕ Agregar al Carrito"):
             p_id = df_productos.loc[idx_sel, "id"]
@@ -380,7 +380,7 @@ elif menu == "Registrar Venta (POS)":
             df_carrito = pd.DataFrame(st.session_state.carrito_chanclas)
             
             df_carrito_display = df_carrito[["nombre", "cantidad_doc", "precio_docena", "subtotal"]].copy()
-            df_carrito_display.columns = ["Modelo", "Docenas Vendidas", "Precio x Docena (S/)", "Subtotal Parcial (S/)"]
+            df_carrito_display.columns = ["Modelo", "Docenas Vendidas", "Precio x Docena (S/)", "Importe (S/)"]
             st.dataframe(df_carrito_display, use_container_width=True)
 
             total_original = df_carrito["subtotal"].sum()
@@ -491,8 +491,8 @@ elif menu == "Historial de Ventas":
         
         for _, row in df_hist.iterrows():
             with st.container(border=True):
-                # Distribuimos el espacio en 8 columnas para separar modelo, talla y precio por docena
-                col1, col2, col3, col4, col5, col6, col7, col8 = st.columns([0.9, 0.9, 1.2, 1.8, 0.8, 0.9, 0.9, 1.3])
+                # Distribuimos el espacio con 9 columnas para incluir el importe correctamente
+                col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns([0.8, 0.8, 1.2, 1.6, 0.7, 0.8, 1.0, 1.0, 1.3])
                 
                 with col1:
                     st.markdown(f"**Tipo:**<br>{row['tipo_comprobante']}", unsafe_allow_html=True)
@@ -509,6 +509,8 @@ elif menu == "Historial de Ventas":
                 with col7:
                     st.markdown(f"**Precio x Doc:**<br>S/ {row['precio_docena']:.2f}", unsafe_allow_html=True)
                 with col8:
+                    st.markdown(f"**Importe:**<br>S/ {row['subtotal']:.2f}", unsafe_allow_html=True)
+                with col9:
                     st.markdown("**Comprobante:**")
                     url = str(row['boleta_url']).strip()
                     if url and url not in ["", "None", "nan", "NaN", "null", "0"] and url.startswith("http"):
