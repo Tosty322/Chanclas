@@ -157,12 +157,12 @@ menu = st.sidebar.selectbox(
     "Seleccione una opción",
     [
         "Inventario Actual",
-        "Registrar Modelo",
-        "Registrar Venta (POS)",
-        "Historial de Ventas",
-        "Reporte Diario de Ventas",
         "Registrar Gasto",
+        "Registrar Venta (POS)",
+        "Reporte Diario de Ventas",
+        "Historial de Ventas",
         "Reposición de Mercadería",
+        "Registrar Modelo",
         "Eliminar Modelo",
     ],
 )
@@ -257,77 +257,95 @@ if menu == "Inventario Actual":
                     st.markdown(f"<div class='product-notes'>📝 <b>Apunte:</b> {row['apuntes']}</div>", unsafe_allow_html=True)
 
 # -------------------------------------------------------------
-# 2. REGISTRAR PRODUCTO
+# 2. REGISTRAR GASTO
 # -------------------------------------------------------------
-elif menu == "Registrar Modelo":
-    st.header("➕ Registrar Nuevo Modelo")
+elif menu == "Registrar Gasto":
+    st.header("💸 Registro de Gastos Operativos")
+    
+    with st.form("form_gastos"):
+        categoria_gasto = st.selectbox(
+            "Seleccione la categoría del gasto",
+            [
+                "comida y bebida",
+                "papel higiénico",
+                "jabón liquido",
+                "bolsas",
+                "nota de venta",
+                "sacos",
+                "plumón o lapiceros",
+                "gasto Estrella",
+                "gasto Estela",
+                "otros"
+            ]
+        )
 
-    with st.form("form_producto"):
-        col1, col2 = st.columns(2)
-        with col1:
-            codigo = st.text_input("Código Interno (Ej: SAN-001)")
-            nombre = st.text_input("Nombre / Modelo (Ej: Modelo Anatómico de Cuero)")
-            categoria = st.selectbox(
-                "Categoría",
-                ["Dama", "Caballero", "Niño", "Niña", "Juvenil"],
-            )
-            origen = st.selectbox("Origen del Producto", ["Nacional", "Internacional"])
-        with col2:
-            talla = st.text_input("Talla (Ej: 36, 37, 38 o Rango 36-39)")
-            
-            st.markdown("<b>📦 Stock Inicial (Docenas y Unidades):</b>", unsafe_allow_html=True)
-            col_doc, col_und = st.columns(2)
-            with col_doc:
-                stock_docenas = st.number_input("Docenas", min_value=0, value=1, step=1)
-            with col_und:
-                stock_unidades_sueltas = st.number_input("Unidades sueltas", min_value=0, max_value=11, value=0, step=1)
-            
-            stock_inicial_unidades = float((stock_docenas * 12) + stock_unidades_sueltas)
-            st.info(f"💡 Total equivalente a registrar: **{stock_docenas} doc. y {stock_unidades_sueltas} un.** (**{int(stock_inicial_unidades)} unidades** en total)")
+        nota_opcional = ""
+        if categoria_gasto == "otros":
+            nota_opcional = st.text_input("Nota opcional (Detalle de 'otros')")
 
-            precio_venta = st.number_input("Precio de Venta por Docena (S/)", min_value=0.0, format="%.2f")
-            precio_compra = st.number_input("Precio de Compra / Costo por Docena (S/)", min_value=0.0, format="%.2f")
-            
-        apuntes = st.text_area("Apuntes u Observaciones (Opcional)", placeholder="Ej: Material sintético importado de Brasil, horma pequeña...")
-        foto_subida = st.file_uploader("Foto del Modelo", type=["jpg", "jpeg", "png", "webp"])
+        col_g1, col_g2 = st.columns(2)
+        with col_g1:
+            importe_gasto = st.number_input("Importe del Gasto (S/)", min_value=0.0, format="%.2f", step=1.0)
+        with col_g2:
+            metodo_pago_gasto = st.selectbox("¿De dónde salió el dinero para el gasto?", ["Efectivo", "Yape / Plin", "Tarjeta"])
+        
+        btn_guardar_gasto = st.form_submit_button("Guardar Gasto")
 
-        submit = st.form_submit_button("Guardar Modelo")
-
-        if submit:
-            if codigo and nombre:
-                foto_url = ""
-                if foto_subida is not None:
-                    with st.spinner("Subiendo foto..."):
-                        img_comp = comprimir_imagen(foto_subida)
-                        nombre_archivo = f"modelo_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
-                        foto_url = subir_a_supabase(img_comp, nombre_archivo, "inventario")
-
-                try:
-                    engine = conectar_db()
-                    with engine.begin() as conn:
-                        conn.execute(
-                            text("""
-                                INSERT INTO productos (codigo_interno, nombre, categoria, origen, talla, stock, precio_venta, precio_compra, foto_url, apuntes)
-                                VALUES (:codigo, :nombre, :categoria, :origen, :talla, :stock, :precio_venta, :precio_compra, :foto_url, :apuntes)
-                            """),
-                            dict(
-                                codigo=codigo,
-                                nombre=nombre,
-                                categoria=categoria,
-                                origen=origen,
-                                talla=talla,
-                                stock=float(stock_inicial_unidades),
-                                precio_venta=precio_venta,
-                                precio_compra=precio_compra,
-                                foto_url=foto_url,
-                                apuntes=apuntes,
-                            ),
+        if btn_guardar_gasto:
+            try:
+                engine = conectar_db()
+                fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                
+                with engine.begin() as conn:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS gastos (
+                            id SERIAL PRIMARY KEY,
+                            fecha_hora TIMESTAMP,
+                            categoria VARCHAR(100),
+                            nota VARCHAR(255),
+                            metodo_pago VARCHAR(50) DEFAULT 'Efectivo',
+                            importe NUMERIC(10, 2)
                         )
-                    st.success(f"¡Modelo '{nombre}' registrado con éxito! (Stock: {formatear_stock(stock_inicial_unidades)})")
-                except Exception as e:
-                    st.error(f"Error al registrar (el código ya podría existir): {e}")
-            else:
-                st.warning("Completa al menos el código y el nombre.")
+                    """))
+                    
+                    conn.execute(text("""
+                        DO $$ 
+                        BEGIN 
+                            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='gastos' and column_name='metodo_pago') THEN
+                                ALTER TABLE gastos ADD COLUMN metodo_pago VARCHAR(50) DEFAULT 'Efectivo';
+                            END IF;
+                        END $$;
+                    """))
+                    
+                    conn.execute(
+                        text("""
+                            INSERT INTO gastos (fecha_hora, categoria, nota, metodo_pago, importe)
+                            VALUES (:f_h, :cat, :nota, :m_p, :imp)
+                        """),
+                        dict(
+                            f_h=fecha_actual,
+                            cat=categoria_gasto,
+                            nota=nota_opcional,
+                            m_p=metodo_pago_gasto,
+                            imp=float(importe_gasto)
+                        )
+                    )
+                st.success(f"✅ Gasto de **S/ {importe_gasto:.2f}** ({categoria_gasto}) pagado con **{metodo_pago_gasto}** registrado con éxito.")
+            except Exception as e:
+                st.error(f"Error al registrar el gasto: {e}")
+
+    st.divider()
+    st.subheader("📋 Historial de Gastos Recientes")
+    try:
+        engine = conectar_db()
+        df_gastos = pd.read_sql(text("SELECT fecha_hora, categoria, metodo_pago, nota, importe FROM gastos ORDER BY id DESC LIMIT 20"), engine)
+        if df_gastos.empty:
+            st.info("No hay gastos registrados todavía.")
+        else:
+            df_gastos.columns = ["Fecha y Hora", "Categoría", "Método de Pago", "Nota Opcional", "Importe (S/)"]
+            st.dataframe(df_gastos, use_container_width=True)
+    except Exception:
+        st.info("Aún no se ha creado la tabla de gastos en la base de datos (se creará al registrar el primer gasto).")
 
 # -------------------------------------------------------------
 # 3. REGISTRAR VENTA (POS)
@@ -493,109 +511,7 @@ elif menu == "Registrar Venta (POS)":
                     st.rerun()
 
 # -------------------------------------------------------------
-# 4. HISTORIAL DE VENTAS
-# -------------------------------------------------------------
-elif menu == "Historial de Ventas":
-    st.header("📊 Historial de Ventas y Comprobantes")
-    engine = conectar_db()
-    query_hist = """
-        SELECT 
-            v.id AS id_interno,
-            v.fecha_hora,
-            v.tipo_comprobante,
-            v.numero_comprobante,
-            p.nombre AS modelo,
-            p.talla,
-            dv.cantidad AS docenas_vendidas,
-            dv.precio_unitario AS precio_docena,
-            dv.subtotal,
-            v.metodo_pago,
-            v.boleta_url
-        FROM detalle_ventas dv
-        JOIN ventas v ON dv.venta_id = v.id
-        JOIN productos p ON dv.producto_id = p.id
-        ORDER BY v.id DESC
-    """
-    df_hist = pd.read_sql(query_hist, engine)
-
-    if df_hist.empty:
-        st.info("No hay ventas registradas.")
-    else:
-        df_hist["tipo_comprobante"] = df_hist["tipo_comprobante"].fillna("Nota de Venta")
-        df_hist["numero_comprobante"] = df_hist["numero_comprobante"].fillna("S/N")
-        
-        def calcular_docenas_enteras(val):
-            total_unidades = int(round(float(val) * 12))
-            return total_unidades // 12
-
-        def calcular_unidades_sueltas(val):
-            total_unidades = int(round(float(val) * 12))
-            return total_unidades % 12
-
-        df_hist["docenas_enteras"] = df_hist["docenas_vendidas"].apply(calcular_docenas_enteras)
-        df_hist["unidades_sueltas"] = df_hist["docenas_vendidas"].apply(calcular_unidades_sueltas)
-
-        df_csv = df_hist[[
-            "tipo_comprobante", "numero_comprobante", "fecha_hora", "modelo", 
-            "talla", "docenas_vendidas", "docenas_enteras", "unidades_sueltas", "precio_docena", "subtotal", "metodo_pago", "boleta_url"
-        ]].copy()
-        
-        df_csv.columns = [
-            "Tipo Comprobante", "N° Comprobante", "Fecha y Hora", "Modelo", 
-            "Talla", "Docenas (Fracción)", "Docenas Enteras", "Unidades Sueltas", "Precio x Docena (S/)", "Importe (S/)", "Método de Pago", "URL Comprobante"
-        ]
-        
-        csv_data = df_csv.to_csv(index=False).encode('utf-8')
-        
-        st.download_button(
-            label="📥 Descargar Historial en CSV",
-            data=csv_data,
-            file_name=f"historial_ventas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv",
-        )
-        
-        st.divider()
-
-        for _, row in df_hist.iterrows():
-            with st.container(border=True):
-                cols = st.columns([0.8, 0.8, 1.1, 1.4, 0.6, 0.7, 0.6, 0.6, 0.8, 0.8, 1.1])
-                
-                doc_entera = int(row['docenas_enteras'])
-                und_suelta = int(row['unidades_sueltas'])
-                fraccion_doc = float(row['docenas_vendidas'])
-                
-                estilo = "<div style='font-size: 12px; line-height: 1.2; overflow-wrap: break-word;'>"
-                cierre = "</div>"
-
-                with cols[0]:
-                    st.markdown(f"{estilo}<b>Tipo:</b><br>{row['tipo_comprobante']}{cierre}", unsafe_allow_html=True)
-                with cols[1]:
-                    st.markdown(f"{estilo}<b>N°:</b><br>{row['numero_comprobante']}{cierre}", unsafe_allow_html=True)
-                with cols[2]:
-                    st.markdown(f"{estilo}<b>Fecha:</b><br>{row['fecha_hora']}{cierre}", unsafe_allow_html=True)
-                with cols[3]:
-                    st.markdown(f"{estilo}<b>Modelo:</b><br>{row['modelo']}{cierre}", unsafe_allow_html=True)
-                with cols[4]:
-                    st.markdown(f"{estilo}<b>Talla:</b><br>{row['talla']}{cierre}", unsafe_allow_html=True)
-                with cols[5]:
-                    st.markdown(f"{estilo}<b>Doc(F):</b><br>{fraccion_doc:.3f}{cierre}", unsafe_allow_html=True)
-                with cols[6]:
-                    st.markdown(f"{estilo}<b>Doc:</b><br>{doc_entera}{cierre}", unsafe_allow_html=True)
-                with cols[7]:
-                    st.markdown(f"{estilo}<b>Und:</b><br>{und_suelta}{cierre}", unsafe_allow_html=True)
-                with cols[8]:
-                    st.markdown(f"{estilo}<b>Prec/Doc:</b><br>S/ {row['precio_docena']:.2f}{cierre}", unsafe_allow_html=True)
-                with cols[9]:
-                    st.markdown(f"{estilo}<b>Importe:</b><br>S/ {row['subtotal']:.2f}{cierre}", unsafe_allow_html=True)
-                with cols[10]:
-                    url = str(row['boleta_url']).strip()
-                    if url and url not in ["", "None", "nan", "NaN", "null", "0"] and url.startswith("http"):
-                        st.markdown(f"{estilo}<b>Comprobante:</b><br><a href='{url}' target='_blank'>Ver foto</a>{cierre}", unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"{estilo}<b>Comprobante:</b><br><span style='color: #9CA3AF;'>No adjunto</span>{cierre}", unsafe_allow_html=True)
-
-# -------------------------------------------------------------
-# 5. REPORTE DIARIO DE VENTAS
+# 4. REPORTE DIARIO DE VENTAS
 # -------------------------------------------------------------
 elif menu == "Reporte Diario de Ventas":
     st.header("📅 Reporte Diario y Control de Flujo de Dinero")
@@ -738,98 +654,109 @@ elif menu == "Reporte Diario de Ventas":
         st.error(f"Error al cargar el reporte diario y balance: {e}")
 
 # -------------------------------------------------------------
-# 6. REGISTRAR GASTO
+# 5. HISTORIAL DE VENTAS
 # -------------------------------------------------------------
-elif menu == "Registrar Gasto":
-    st.header("💸 Registro de Gastos Operativos")
-    
-    with st.form("form_gastos"):
-        categoria_gasto = st.selectbox(
-            "Seleccione la categoría del gasto",
-            [
-                "comida y bebida",
-                "papel higiénico",
-                "jabón liquido",
-                "bolsas",
-                "nota de venta",
-                "sacos",
-                "plumón o lapiceros",
-                "gasto Estrella",
-                "gasto Estela",
-                "otros"
-            ]
-        )
+elif menu == "Historial de Ventas":
+    st.header("📊 Historial de Ventas y Comprobantes")
+    engine = conectar_db()
+    query_hist = """
+        SELECT 
+            v.id AS id_interno,
+            v.fecha_hora,
+            v.tipo_comprobante,
+            v.numero_comprobante,
+            p.nombre AS modelo,
+            p.talla,
+            dv.cantidad AS docenas_vendidas,
+            dv.precio_unitario AS precio_docena,
+            dv.subtotal,
+            v.metodo_pago,
+            v.boleta_url
+        FROM detalle_ventas dv
+        JOIN ventas v ON dv.venta_id = v.id
+        JOIN productos p ON dv.producto_id = p.id
+        ORDER BY v.id DESC
+    """
+    df_hist = pd.read_sql(query_hist, engine)
 
-        nota_opcional = ""
-        if categoria_gasto == "otros":
-            nota_opcional = st.text_input("Nota opcional (Detalle de 'otros')")
-
-        col_g1, col_g2 = st.columns(2)
-        with col_g1:
-            importe_gasto = st.number_input("Importe del Gasto (S/)", min_value=0.0, format="%.2f", step=1.0)
-        with col_g2:
-            metodo_pago_gasto = st.selectbox("¿De dónde salió el dinero para el gasto?", ["Efectivo", "Yape / Plin", "Tarjeta"])
+    if df_hist.empty:
+        st.info("No hay ventas registradas.")
+    else:
+        df_hist["tipo_comprobante"] = df_hist["tipo_comprobante"].fillna("Nota de Venta")
+        df_hist["numero_comprobante"] = df_hist["numero_comprobante"].fillna("S/N")
         
-        btn_guardar_gasto = st.form_submit_button("Guardar Gasto")
+        def calcular_docenas_enteras(val):
+            total_unidades = int(round(float(val) * 12))
+            return total_unidades // 12
 
-        if btn_guardar_gasto:
-            try:
-                engine = conectar_db()
-                fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        def calcular_unidades_sueltas(val):
+            total_unidades = int(round(float(val) * 12))
+            return total_unidades % 12
+
+        df_hist["docenas_enteras"] = df_hist["docenas_vendidas"].apply(calcular_docenas_enteras)
+        df_hist["unidades_sueltas"] = df_hist["docenas_vendidas"].apply(calcular_unidades_sueltas)
+
+        df_csv = df_hist[[
+            "tipo_comprobante", "numero_comprobante", "fecha_hora", "modelo", 
+            "talla", "docenas_vendidas", "docenas_enteras", "unidades_sueltas", "precio_docena", "subtotal", "metodo_pago", "boleta_url"
+        ]].copy()
+        
+        df_csv.columns = [
+            "Tipo Comprobante", "N° Comprobante", "Fecha y Hora", "Modelo", 
+            "Talla", "Docenas (Fracción)", "Docenas Enteras", "Unidades Sueltas", "Precio x Docena (S/)", "Importe (S/)", "Método de Pago", "URL Comprobante"
+        ]
+        
+        csv_data = df_csv.to_csv(index=False).encode('utf-8')
+        
+        st.download_button(
+            label="📥 Descargar Historial en CSV",
+            data=csv_data,
+            file_name=f"historial_ventas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv",
+        )
+        
+        st.divider()
+
+        for _, row in df_hist.iterrows():
+            with st.container(border=True):
+                cols = st.columns([0.8, 0.8, 1.1, 1.4, 0.6, 0.7, 0.6, 0.6, 0.8, 0.8, 1.1])
                 
-                with engine.begin() as conn:
-                    conn.execute(text("""
-                        CREATE TABLE IF NOT EXISTS gastos (
-                            id SERIAL PRIMARY KEY,
-                            fecha_hora TIMESTAMP,
-                            categoria VARCHAR(100),
-                            nota VARCHAR(255),
-                            metodo_pago VARCHAR(50) DEFAULT 'Efectivo',
-                            importe NUMERIC(10, 2)
-                        )
-                    """))
-                    
-                    conn.execute(text("""
-                        DO $$ 
-                        BEGIN 
-                            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='gastos' and column_name='metodo_pago') THEN
-                                ALTER TABLE gastos ADD COLUMN metodo_pago VARCHAR(50) DEFAULT 'Efectivo';
-                            END IF;
-                        END $$;
-                    """))
-                    
-                    conn.execute(
-                        text("""
-                            INSERT INTO gastos (fecha_hora, categoria, nota, metodo_pago, importe)
-                            VALUES (:f_h, :cat, :nota, :m_p, :imp)
-                        """),
-                        dict(
-                            f_h=fecha_actual,
-                            cat=categoria_gasto,
-                            nota=nota_opcional,
-                            m_p=metodo_pago_gasto,
-                            imp=float(importe_gasto)
-                        )
-                    )
-                st.success(f"✅ Gasto de **S/ {importe_gasto:.2f}** ({categoria_gasto}) pagado con **{metodo_pago_gasto}** registrado con éxito.")
-            except Exception as e:
-                st.error(f"Error al registrar el gasto: {e}")
+                doc_entera = int(row['docenas_enteras'])
+                und_suelta = int(row['unidades_sueltas'])
+                fraccion_doc = float(row['docenas_vendidas'])
+                
+                estilo = "<div style='font-size: 12px; line-height: 1.2; overflow-wrap: break-word;'>"
+                cierre = "</div>"
 
-    st.divider()
-    st.subheader("📋 Historial de Gastos Recientes")
-    try:
-        engine = conectar_db()
-        df_gastos = pd.read_sql(text("SELECT fecha_hora, categoria, metodo_pago, nota, importe FROM gastos ORDER BY id DESC LIMIT 20"), engine)
-        if df_gastos.empty:
-            st.info("No hay gastos registrados todavía.")
-        else:
-            df_gastos.columns = ["Fecha y Hora", "Categoría", "Método de Pago", "Nota Opcional", "Importe (S/)"]
-            st.dataframe(df_gastos, use_container_width=True)
-    except Exception:
-        st.info("Aún no se ha creado la tabla de gastos en la base de datos (se creará al registrar el primer gasto).")
+                with cols[0]:
+                    st.markdown(f"{estilo}<b>Tipo:</b><br>{row['tipo_comprobante']}{cierre}", unsafe_allow_html=True)
+                with cols[1]:
+                    st.markdown(f"{estilo}<b>N°:</b><br>{row['numero_comprobante']}{cierre}", unsafe_allow_html=True)
+                with cols[2]:
+                    st.markdown(f"{estilo}<b>Fecha:</b><br>{row['fecha_hora']}{cierre}", unsafe_allow_html=True)
+                with cols[3]:
+                    st.markdown(f"{estilo}<b>Modelo:</b><br>{row['modelo']}{cierre}", unsafe_allow_html=True)
+                with cols[4]:
+                    st.markdown(f"{estilo}<b>Talla:</b><br>{row['talla']}{cierre}", unsafe_allow_html=True)
+                with cols[5]:
+                    st.markdown(f"{estilo}<b>Doc(F):</b><br>{fraccion_doc:.3f}{cierre}", unsafe_allow_html=True)
+                with cols[6]:
+                    st.markdown(f"{estilo}<b>Doc:</b><br>{doc_entera}{cierre}", unsafe_allow_html=True)
+                with cols[7]:
+                    st.markdown(f"{estilo}<b>Und:</b><br>{und_suelta}{cierre}", unsafe_allow_html=True)
+                with cols[8]:
+                    st.markdown(f"{estilo}<b>Prec/Doc:</b><br>S/ {row['precio_docena']:.2f}{cierre}", unsafe_allow_html=True)
+                with cols[9]:
+                    st.markdown(f"{estilo}<b>Importe:</b><br>S/ {row['subtotal']:.2f}{cierre}", unsafe_allow_html=True)
+                with cols[10]:
+                    url = str(row['boleta_url']).strip()
+                    if url and url not in ["", "None", "nan", "NaN", "null", "0"] and url.startswith("http"):
+                        st.markdown(f"{estilo}<b>Comprobante:</b><br><a href='{url}' target='_blank'>Ver foto</a>{cierre}", unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"{estilo}<b>Comprobante:</b><br><span style='color: #9CA3AF;'>No adjunto</span>{cierre}", unsafe_allow_html=True)
 
 # -------------------------------------------------------------
-# 7. REPOSICIÓN DE MERCADERÍA
+# 6. REPOSICIÓN DE MERCADERÍA
 # -------------------------------------------------------------
 elif menu == "Reposición de Mercadería":
     st.header("🔄 Reposición y Alerta de Stock Bajo")
@@ -865,7 +792,6 @@ elif menu == "Reposición de Mercadería":
             with col_und_rep:
                 rep_unidades_sueltas = st.number_input("Unidades sueltas que ingresan", min_value=0, max_value=11, value=0, step=1)
             
-            # Conversión automática a unidades totales para la reposición
             total_unidades_ingreso = float((rep_docenas * 12) + rep_unidades_sueltas)
             st.info(f"💡 Total equivalente a sumar: **{rep_docenas} doc. y {rep_unidades_sueltas} un.** (**{int(total_unidades_ingreso)} unidades** en total)")
             
@@ -886,6 +812,79 @@ elif menu == "Reposición de Mercadería":
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error al actualizar el stock: {e}")
+
+# -------------------------------------------------------------
+# 7. REGISTRAR PRODUCTO
+# -------------------------------------------------------------
+elif menu == "Registrar Modelo":
+    st.header("➕ Registrar Nuevo Modelo")
+
+    with st.form("form_producto"):
+        col1, col2 = st.columns(2)
+        with col1:
+            codigo = st.text_input("Código Interno (Ej: SAN-001)")
+            nombre = st.text_input("Nombre / Modelo (Ej: Modelo Anatómico de Cuero)")
+            categoria = st.selectbox(
+                "Categoría",
+                ["Dama", "Caballero", "Niño", "Niña", "Juvenil"],
+            )
+            origen = st.selectbox("Origen del Producto", ["Nacional", "Internacional"])
+        with col2:
+            talla = st.text_input("Talla (Ej: 36, 37, 38 o Rango 36-39)")
+            
+            st.markdown("<b>📦 Stock Inicial (Docenas y Unidades):</b>", unsafe_allow_html=True)
+            col_doc, col_und = st.columns(2)
+            with col_doc:
+                stock_docenas = st.number_input("Docenas", min_value=0, value=1, step=1)
+            with col_und:
+                stock_unidades_sueltas = st.number_input("Unidades sueltas", min_value=0, max_value=11, value=0, step=1)
+            
+            stock_inicial_unidades = float((stock_docenas * 12) + stock_unidades_sueltas)
+            st.info(f"💡 Total equivalente a registrar: **{stock_docenas} doc. y {stock_unidades_sueltas} un.** (**{int(stock_inicial_unidades)} unidades** en total)")
+
+            precio_venta = st.number_input("Precio de Venta por Docena (S/)", min_value=0.0, format="%.2f")
+            precio_compra = st.number_input("Precio de Compra / Costo por Docena (S/)", min_value=0.0, format="%.2f")
+            
+        apuntes = st.text_area("Apuntes u Observaciones (Opcional)", placeholder="Ej: Material sintético importado de Brasil, horma pequeña...")
+        foto_subida = st.file_uploader("Foto del Modelo", type=["jpg", "jpeg", "png", "webp"])
+
+        submit = st.form_submit_button("Guardar Modelo")
+
+        if submit:
+            if codigo and nombre:
+                foto_url = ""
+                if foto_subida is not None:
+                    with st.spinner("Subiendo foto..."):
+                        img_comp = comprimir_imagen(foto_subida)
+                        nombre_archivo = f"modelo_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+                        foto_url = subir_a_supabase(img_comp, nombre_archivo, "inventario")
+
+                try:
+                    engine = conectar_db()
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text("""
+                                INSERT INTO productos (codigo_interno, nombre, categoria, origen, talla, stock, precio_venta, precio_compra, foto_url, apuntes)
+                                VALUES (:codigo, :nombre, :categoria, :origen, :talla, :stock, :precio_venta, :precio_compra, :foto_url, :apuntes)
+                            """),
+                            dict(
+                                codigo=codigo,
+                                nombre=nombre,
+                                categoria=categoria,
+                                origen=origen,
+                                talla=talla,
+                                stock=float(stock_inicial_unidades),
+                                precio_venta=precio_venta,
+                                precio_compra=precio_compra,
+                                foto_url=foto_url,
+                                apuntes=apuntes,
+                            ),
+                        )
+                    st.success(f"¡Modelo '{nombre}' registrado con éxito! (Stock: {formatear_stock(stock_inicial_unidades)})")
+                except Exception as e:
+                    st.error(f"Error al registrar (el código ya podría existir): {e}")
+            else:
+                st.warning("Completa al menos el código y el nombre.")
 
 # -------------------------------------------------------------
 # 8. ELIMINAR PRODUCTO
