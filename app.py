@@ -206,7 +206,7 @@ if menu == "Inventario Actual":
                 stock_texto = formatear_stock(row['stock'])
 
                 with col_info1:
-                    st.markdown(f"<div class='product-title'>{row['nombre']}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='product-title'>Modelo: {row['nombre']}</div>", unsafe_allow_html=True)
                     st.markdown(f"<div class='product-info'>Código: <b>{row['codigo_interno']}</b></div>", unsafe_allow_html=True)
                     st.markdown(f"<div class='product-info'>Categoría: <b>{row['categoria']}</b></div>", unsafe_allow_html=True)
 
@@ -491,7 +491,6 @@ elif menu == "Historial de Ventas":
         
         for _, row in df_hist.iterrows():
             with st.container(border=True):
-                # Distribuimos el espacio con 9 columnas para incluir el importe correctamente
                 col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns([0.8, 0.8, 1.2, 1.6, 0.7, 0.8, 1.0, 1.0, 1.3])
                 
                 with col1:
