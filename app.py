@@ -508,7 +508,6 @@ elif menu == "Historial de Ventas":
         df_hist["tipo_comprobante"] = df_hist["tipo_comprobante"].fillna("Nota de Venta")
         df_hist["numero_comprobante"] = df_hist["numero_comprobante"].fillna("S/N")
         
-        # Calculamos las docenas enteras y las unidades sueltas enteras a partir de las docenas vendidas
         def calcular_docenas_enteras(val):
             total_unidades = int(round(float(val) * 12))
             return total_unidades // 12
@@ -520,7 +519,6 @@ elif menu == "Historial de Ventas":
         df_hist["docenas_enteras"] = df_hist["docenas_vendidas"].apply(calcular_docenas_enteras)
         df_hist["unidades_sueltas"] = df_hist["docenas_vendidas"].apply(calcular_unidades_sueltas)
 
-        # Preparamos el CSV incluyendo la fracción, docenas enteras y unidades
         df_csv = df_hist[[
             "tipo_comprobante", "numero_comprobante", "fecha_hora", "modelo", 
             "talla", "docenas_vendidas", "docenas_enteras", "unidades_sueltas", "precio_docena", "subtotal", "metodo_pago", "boleta_url"
@@ -542,44 +540,46 @@ elif menu == "Historial de Ventas":
         
         st.divider()
 
+        # Iteramos y generamos la fila de ventas aplicando un formato CSS pequeño y compacto en línea
         for _, row in df_hist.iterrows():
             with st.container(border=True):
-                # Ampliamos a 10 columnas para separar Fracción, Docenas enteras y Unidades enteras claramente
-                col1, col2, col3, col4, col5, col6, col7, col8, col9, col10 = st.columns([0.7, 0.7, 1.1, 1.5, 0.6, 0.7, 0.7, 0.9, 0.9, 1.2])
+                # 11 columnas definidas para abarcar toda la fila, con pesos ajustados
+                cols = st.columns([0.8, 0.8, 1.1, 1.4, 0.6, 0.7, 0.6, 0.6, 0.8, 0.8, 1.1])
                 
                 doc_entera = int(row['docenas_enteras'])
                 und_suelta = int(row['unidades_sueltas'])
                 fraccion_doc = float(row['docenas_vendidas'])
+                
+                # Definimos el estilo HTML para hacer la letra más pequeña (12px)
+                estilo = "<div style='font-size: 12px; line-height: 1.2; overflow-wrap: break-word;'>"
+                cierre = "</div>"
 
-                with col1:
-                    st.markdown(f"**Tipo:**<br>{row['tipo_comprobante']}", unsafe_allow_html=True)
-                with col2:
-                    st.markdown(f"**N°:**<br>{row['numero_comprobante']}", unsafe_allow_html=True)
-                with col3:
-                    st.markdown(f"**Fecha:**<br>{row['fecha_hora']}", unsafe_allow_html=True)
-                with col4:
-                    st.markdown(f"**Modelo:**<br>{row['modelo']}", unsafe_allow_html=True)
-                with col5:
-                    st.markdown(f"**Talla:**<br>{row['talla']}", unsafe_allow_html=True)
-                with col6:
-                    st.markdown(f"**Doc. (Frac):**<br>{fraccion_doc:.3f}", unsafe_allow_html=True)
-                with col7:
-                    st.markdown(f"**Docenas:**<br>{doc_entera}", unsafe_allow_html=True)
-                with col8:
-                    st.markdown(f"**Unidades:**<br>{und_suelta}", unsafe_allow_html=True)
-                with col9:
-                    st.markdown(f"**Precio x Doc:**<br>S/ {row['precio_docena']:.2f}", unsafe_allow_html=True)
-                with col10:
-                    st.markdown(f"**Importe:**<br>S/ {row['subtotal']:.2f}", unsafe_allow_html=True)
-
-            # Fila adicional o sección pequeña dentro del contenedor para mostrar el comprobante de forma limpia
-            with st.container():
-                url = str(row['boleta_url']).strip()
-                if url and url not in ["", "None", "nan", "NaN", "null", "0"] and url.startswith("http"):
-                    st.markdown(f"📎 **Comprobante:** [Ver comprobante]({url})")
-                else:
-                    st.markdown("<span style='color: #6B7280; font-size: 13px;'>📎 <b>Comprobante:</b> No se adjuntó comprobante</span>", unsafe_allow_html=True)
-            st.divider()
+                with cols[0]:
+                    st.markdown(f"{estilo}<b>Tipo:</b><br>{row['tipo_comprobante']}{cierre}", unsafe_allow_html=True)
+                with cols[1]:
+                    st.markdown(f"{estilo}<b>N°:</b><br>{row['numero_comprobante']}{cierre}", unsafe_allow_html=True)
+                with cols[2]:
+                    st.markdown(f"{estilo}<b>Fecha:</b><br>{row['fecha_hora']}{cierre}", unsafe_allow_html=True)
+                with cols[3]:
+                    st.markdown(f"{estilo}<b>Modelo:</b><br>{row['modelo']}{cierre}", unsafe_allow_html=True)
+                with cols[4]:
+                    st.markdown(f"{estilo}<b>Talla:</b><br>{row['talla']}{cierre}", unsafe_allow_html=True)
+                with cols[5]:
+                    st.markdown(f"{estilo}<b>Doc(F):</b><br>{fraccion_doc:.3f}{cierre}", unsafe_allow_html=True)
+                with cols[6]:
+                    st.markdown(f"{estilo}<b>Doc:</b><br>{doc_entera}{cierre}", unsafe_allow_html=True)
+                with cols[7]:
+                    st.markdown(f"{estilo}<b>Und:</b><br>{und_suelta}{cierre}", unsafe_allow_html=True)
+                with cols[8]:
+                    st.markdown(f"{estilo}<b>Prec/Doc:</b><br>S/ {row['precio_docena']:.2f}{cierre}", unsafe_allow_html=True)
+                with cols[9]:
+                    st.markdown(f"{estilo}<b>Importe:</b><br>S/ {row['subtotal']:.2f}{cierre}", unsafe_allow_html=True)
+                with cols[10]:
+                    url = str(row['boleta_url']).strip()
+                    if url and url not in ["", "None", "nan", "NaN", "null", "0"] and url.startswith("http"):
+                        st.markdown(f"{estilo}<b>Comprobante:</b><br><a href='{url}' target='_blank'>Ver foto</a>{cierre}", unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"{estilo}<b>Comprobante:</b><br><span style='color: #9CA3AF;'>No adjunto</span>{cierre}", unsafe_allow_html=True)
 
 # -------------------------------------------------------------
 # 5. REPOSICIÓN DE MERCADERÍA
