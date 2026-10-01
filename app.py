@@ -129,8 +129,9 @@ def subir_a_supabase(file_buffer, nombre_archivo, carpeta):
         return None
     try:
         path = f"{carpeta}/{nombre_archivo}"
+        # Usamos file_options con upsert para asegurar que se suba correctamente
         supabase.storage.from_("archivos-chanclas").upload(
-            path, file_buffer.getvalue(), file_options={"content-type": "image/jpeg"}
+            path, file_buffer.getvalue(), file_options={"content-type": "image/jpeg", "upsert": "true"}
         )
         return supabase.storage.from_("archivos-chanclas").get_public_url(path)
     except Exception as e:
@@ -489,9 +490,9 @@ elif menu == "Historial de Ventas":
         df_hist["numero_comprobante"] = df_hist["numero_comprobante"].fillna("S/N")
         
         def formatear_enlace_boleta(url):
-            if pd.notna(url) and str(url).strip().startswith("http"):
+            if pd.notna(url) and str(url).strip() not in ["", "None", "nan", "NaN", "null", "0"]:
                 return f"[Ver boleta]({url})"
-            return "Sin foto"
+            return "No se adjunto comprobante"
 
         df_hist["comprobante"] = df_hist["boleta_url"].apply(formatear_enlace_boleta)
         
