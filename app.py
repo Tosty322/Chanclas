@@ -9,7 +9,7 @@ from supabase import create_client
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
-    page_title="Sistema de Ventas - Sandalias", 
+    page_title="Tienda Lima", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
