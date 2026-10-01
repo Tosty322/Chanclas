@@ -173,12 +173,14 @@ if menu == "Inventario Actual":
     st.header("📦 Inventario y Modelos Registrados")
 
     busqueda_inv = st.text_input("🔍 Buscar modelo por nombre o código:")
+    
+    # Consulta segura usando parámetros para evitar errores de sintaxis o SQL injection
     if busqueda_inv:
-        query = f"SELECT * FROM productos WHERE nombre ILIKE '%{busqueda_inv}%' OR codigo_interno ILIKE '%{busqueda_inv}%'"
+        query = text("SELECT * FROM productos WHERE nombre ILIKE :busqueda OR codigo_interno ILIKE :busqueda ORDER BY id DESC")
+        df_productos = pd.read_sql(query, engine, params={"busqueda": f"%{busqueda_inv}%"})
     else:
-        query = "SELECT * FROM productos ORDER BY id DESC"
-
-    df_productos = pd.read_sql(query, engine)
+        query = text("SELECT * FROM productos ORDER BY id DESC")
+        df_productos = pd.read_sql(query, engine)
 
     if "foto_url" in df_productos.columns:
         df_productos["foto_url"] = df_productos["foto_url"].fillna("").astype(str)
@@ -313,11 +315,11 @@ elif menu == "Registrar Venta (POS)":
 
     filtro_pos = st.text_input("🔍 Buscar modelo para vender:")
     if filtro_pos:
-        query_pos = f"SELECT id, codigo_interno, nombre, talla, stock, precio_venta FROM productos WHERE (nombre ILIKE '%{filtro_pos}%' OR codigo_interno ILIKE '%{filtro_pos}%') AND stock > 0"
+        query_pos = text("SELECT id, codigo_interno, nombre, talla, stock, precio_venta FROM productos WHERE (nombre ILIKE :busqueda OR codigo_interno ILIKE :busqueda) AND stock > 0")
+        df_productos = pd.read_sql(query_pos, engine, params={"busqueda": f"%{filtro_pos}%"})
     else:
-        query_pos = "SELECT id, codigo_interno, nombre, talla, stock, precio_venta FROM productos WHERE stock > 0"
-
-    df_productos = pd.read_sql(query_pos, engine)
+        query_pos = text("SELECT id, codigo_interno, nombre, talla, stock, precio_venta FROM productos WHERE stock > 0")
+        df_productos = pd.read_sql(query_pos, engine)
 
     if df_productos.empty:
         st.warning("No hay modelos con stock disponible.")
@@ -488,7 +490,6 @@ elif menu == "Historial de Ventas":
         df_hist["tipo_comprobante"] = df_hist["tipo_comprobante"].fillna("Nota de Venta")
         df_hist["numero_comprobante"] = df_hist["numero_comprobante"].fillna("S/N")
         
-        # Iteramos y mostramos cada venta en una tarjeta/fila personalizada para asegurar la correcta visualización del enlace o texto
         for _, row in df_hist.iterrows():
             with st.container(border=True):
                 col1, col2, col3, col4, col5, col6, col7 = st.columns([1, 1, 1.5, 1.5, 1, 1.2, 1.5])
@@ -523,8 +524,8 @@ elif menu == "Reposición de Mercadería":
     limite_docenas = st.slider("Mostrar modelos con stock menor o igual a (en docenas):", min_value=1, max_value=20, value=5)
     limite_unidades = limite_docenas * 12.0
 
-    query_stock = f"SELECT id, codigo_interno, nombre, categoria, talla, stock, precio_compra FROM productos WHERE stock <= {limite_unidades} ORDER BY stock ASC"
-    df_reposicion = pd.read_sql(query_stock, engine)
+    query_stock = text("SELECT id, codigo_interno, nombre, categoria, talla, stock, precio_compra FROM productos WHERE stock <= :limite ORDER BY stock ASC")
+    df_reposicion = pd.read_sql(query_stock, engine, params={"limite": limite_unidades})
 
     if df_reposicion.empty:
         st.success(f"🎉 ¡Todo en orden! No hay modelos con stock menor o igual a {limite_docenas} docenas.")
@@ -574,7 +575,7 @@ elif menu == "Reposición de Mercadería":
 elif menu == "Eliminar Modelo":
     st.header("🗑️ Eliminar Modelo")
     engine = conectar_db()
-    df_del = pd.read_sql("SELECT id, codigo_interno, nombre FROM productos", engine)
+    df_del = pd.read_sql(text("SELECT id, codigo_interno, nombre FROM productos"), engine)
 
     if df_del.empty:
         st.info("No hay modelos registrados.")
