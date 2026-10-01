@@ -157,11 +157,11 @@ menu = st.sidebar.selectbox(
     "Seleccione una opción",
     [
         "Inventario Actual",
-        "Registrar Producto",
+        "Registrar Modelo",
         "Registrar Venta (POS)",
         "Historial de Ventas",
         "Reposición de Mercadería",
-        "Eliminar Producto",
+        "Eliminar Modelo",
     ],
 )
 
@@ -170,9 +170,9 @@ menu = st.sidebar.selectbox(
 # -------------------------------------------------------------
 if menu == "Inventario Actual":
     engine = conectar_db()
-    st.header("📦 Inventario y Modelos de Sandalias")
+    st.header("📦 Inventario y Modelos Registrados")
 
-    busqueda_inv = st.text_input("🔍 Buscar sandalia por nombre o código:")
+    busqueda_inv = st.text_input("🔍 Buscar modelo por nombre o código:")
     if busqueda_inv:
         query = f"SELECT * FROM productos WHERE nombre ILIKE '%{busqueda_inv}%' OR codigo_interno ILIKE '%{busqueda_inv}%'"
     else:
@@ -196,7 +196,7 @@ if menu == "Inventario Actual":
         df_productos["apuntes"] = ""
 
     if df_productos.empty:
-        st.info("No hay sandalias registradas.")
+        st.info("No hay modelos registrados.")
     else:
         for _, row in df_productos.iterrows():
             with st.container(border=True):
@@ -237,14 +237,14 @@ if menu == "Inventario Actual":
 # -------------------------------------------------------------
 # 2. REGISTRAR PRODUCTO
 # -------------------------------------------------------------
-elif menu == "Registrar Producto":
-    st.header("➕ Registrar Nueva Sandalia")
+elif menu == "Registrar Modelo":
+    st.header("➕ Registrar Nuevo Modelo")
 
     with st.form("form_producto"):
         col1, col2 = st.columns(2)
         with col1:
             codigo = st.text_input("Código Interno (Ej: SAN-001)")
-            nombre = st.text_input("Nombre / Modelo (Ej: Sandalia Anatómica de Cuero)")
+            nombre = st.text_input("Nombre / Modelo (Ej: Modelo Anatómico de Cuero)")
             categoria = st.selectbox(
                 "Categoría",
                 ["Dama", "Caballero", "Niño", "Niña", "Juvenil"],
@@ -266,7 +266,7 @@ elif menu == "Registrar Producto":
         apuntes = st.text_area("Apuntes u Observaciones (Opcional)", placeholder="Ej: Material sintético importado de Brasil, horma pequeña...")
         foto_subida = st.file_uploader("Foto del Modelo", type=["jpg", "jpeg", "png", "webp"])
 
-        submit = st.form_submit_button("Guardar Sandalia")
+        submit = st.form_submit_button("Guardar Modelo")
 
         if submit:
             if codigo and nombre:
@@ -274,7 +274,7 @@ elif menu == "Registrar Producto":
                 if foto_subida is not None:
                     with st.spinner("Subiendo foto..."):
                         img_comp = comprimir_imagen(foto_subida)
-                        nombre_archivo = f"sandalia_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+                        nombre_archivo = f"modelo_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
                         foto_url = subir_a_supabase(img_comp, nombre_archivo, "inventario")
 
                 try:
@@ -298,7 +298,7 @@ elif menu == "Registrar Producto":
                                 apuntes=apuntes,
                             ),
                         )
-                    st.success(f"¡Sandalia '{nombre}' registrada con éxito! (Stock: {formatear_stock(stock_inicial_unidades)})")
+                    st.success(f"¡Modelo '{nombre}' registrado con éxito! (Stock: {formatear_stock(stock_inicial_unidades)})")
                 except Exception as e:
                     st.error(f"Error al registrar (el código ya podría existir): {e}")
             else:
@@ -308,10 +308,10 @@ elif menu == "Registrar Producto":
 # 3. REGISTRAR VENTA (POS)
 # -------------------------------------------------------------
 elif menu == "Registrar Venta (POS)":
-    st.header("🛒 Caja / Punto de Venta - Sandalias")
+    st.header("🛒 Caja / Punto de Venta")
     engine = conectar_db()
 
-    filtro_pos = st.text_input("🔍 Buscar sandalia para vender:")
+    filtro_pos = st.text_input("🔍 Buscar modelo para vender:")
     if filtro_pos:
         query_pos = f"SELECT id, codigo_interno, nombre, talla, stock, precio_venta FROM productos WHERE (nombre ILIKE '%{filtro_pos}%' OR codigo_interno ILIKE '%{filtro_pos}%') AND stock > 0"
     else:
@@ -320,7 +320,7 @@ elif menu == "Registrar Venta (POS)":
     df_productos = pd.read_sql(query_pos, engine)
 
     if df_productos.empty:
-        st.warning("No hay productos con stock disponible.")
+        st.warning("No hay modelos con stock disponible.")
     else:
         if "carrito_chanclas" not in st.session_state:
             st.session_state.carrito_chanclas = []
@@ -335,7 +335,7 @@ elif menu == "Registrar Venta (POS)":
 
         col_select, col_cant = st.columns([2.5, 1.5])
         with col_select:
-            prod_elegido = st.selectbox("Selecciona el producto:", df_productos["opcion_pos"])
+            prod_elegido = st.selectbox("Selecciona el modelo:", df_productos["opcion_pos"])
         
         idx_sel = df_productos[df_productos["opcion_pos"] == prod_elegido].index[0]
         precio_docena_actual = float(df_productos.loc[idx_sel, "precio_venta"])
@@ -379,7 +379,7 @@ elif menu == "Registrar Venta (POS)":
             df_carrito = pd.DataFrame(st.session_state.carrito_chanclas)
             
             df_carrito_display = df_carrito[["nombre", "cantidad_doc", "precio_docena", "subtotal"]].copy()
-            df_carrito_display.columns = ["Producto", "Docenas Vendidas", "Precio x Docena (S/)", "Subtotal Parcial (S/)"]
+            df_carrito_display.columns = ["Modelo", "Docenas Vendidas", "Precio x Docena (S/)", "Subtotal Parcial (S/)"]
             st.dataframe(df_carrito_display, use_container_width=True)
 
             total_original = df_carrito["subtotal"].sum()
@@ -457,7 +457,7 @@ elif menu == "Historial de Ventas":
         SELECT 
             v.id AS n_boleta,
             v.fecha_hora,
-            p.nombre AS sandalia,
+            p.nombre AS modelo,
             p.talla,
             dv.cantidad AS docenas_vendidas,
             dv.precio_unitario AS precio_docena,
@@ -476,14 +476,13 @@ elif menu == "Historial de Ventas":
     else:
         df_hist["n_boleta"] = df_hist["n_boleta"].apply(lambda x: f"#{int(x):04d}")
         
-        # Renombramos columnas para que se vean más amigables en pantalla
         df_hist_display = df_hist[[
-            "n_boleta", "fecha_hora", "sandalia", "talla", 
+            "n_boleta", "fecha_hora", "modelo", "talla", 
             "docenas_vendidas", "precio_docena", "subtotal", "metodo_pago"
         ]].copy()
         
         df_hist_display.columns = [
-            "N° Boleta", "Fecha y Hora", "Sandalia", "Talla", 
+            "N° Boleta", "Fecha y Hora", "Modelo", "Talla", 
             "Docenas Vendidas", "Precio x Docena (S/)", "Subtotal (S/)", "Método de Pago"
         ]
         
@@ -500,26 +499,28 @@ elif menu == "Reposición de Mercadería":
     st.header("🔄 Reposición y Alerta de Stock Bajo")
     engine = conectar_db()
 
-    limite_docenas = st.slider("Mostrar productos con stock menor o igual a (en docenas):", min_value=1, max_value=20, value=5)
+    limite_docenas = st.slider("Mostrar modelos con stock menor o igual a (en docenas):", min_value=1, max_value=20, value=5)
     limite_unidades = limite_docenas * 12.0
 
     query_stock = f"SELECT id, codigo_interno, nombre, categoria, talla, stock, precio_compra FROM productos WHERE stock <= {limite_unidades} ORDER BY stock ASC"
     df_reposicion = pd.read_sql(query_stock, engine)
 
     if df_reposicion.empty:
-        st.success(f"🎉 ¡Todo en orden! No hay sandalias con stock menor o igual a {limite_docenas} docenas.")
+        st.success(f"🎉 ¡Todo en orden! No hay modelos con stock menor o igual a {limite_docenas} docenas.")
     else:
-        st.warning(f"⚠️️ Se encontraron {len(df_reposicion)} productos con stock bajo.")
+        st.warning(f"⚠️ Se encontraron {len(df_reposicion)} modelos con stock bajo.")
         
         df_reposicion["stock_formateado"] = df_reposicion["stock"].apply(formatear_stock)
-        st.dataframe(df_reposicion[["codigo_interno", "nombre", "categoria", "talla", "stock_formateado", "precio_compra"]], use_container_width=True)
+        df_reposicion_display = df_reposicion[["codigo_interno", "nombre", "categoria", "talla", "stock_formateado", "precio_compra"]].copy()
+        df_reposicion_display.columns = ["Código", "Modelo", "Categoría", "Talla", "Stock Actual", "Costo x Docena (S/)"]
+        st.dataframe(df_reposicion_display, use_container_width=True)
 
         st.divider()
         st.subheader("📥 Registrar Ingreso de Mercadería (Repostar)")
 
         with st.form("form_reposicion"):
             df_reposicion["opcion_rep"] = df_reposicion["nombre"] + " [Talla: " + df_reposicion["talla"] + "] - Stock Actual: " + df_reposicion["stock_formateado"]
-            prod_a_reponer = st.selectbox("Selecciona la sandalia que llegó del proveedor:", df_reposicion["opcion_rep"])
+            prod_a_reponer = st.selectbox("Selecciona el modelo que llegó del proveedor:", df_reposicion["opcion_rep"])
             
             st.markdown("<b>📦 Cuánto ingresa (Ingrese el total de unidades, ej: 30):</b>", unsafe_allow_html=True)
             total_unidades_ingreso = st.number_input("Cantidad total de unidades que ingresan", min_value=0, value=12, step=1)
@@ -541,7 +542,7 @@ elif menu == "Reposición de Mercadería":
                             text("UPDATE productos SET stock = stock + :cant WHERE id = :p_id"),
                             dict(cant=float(total_unidades_ingreso), p_id=id_producto)
                         )
-                    st.success(f"✅ ¡Stock actualizado con éxito! Se sumó {formatear_stock(total_unidades_ingreso)} a '{nombre_prod}'.")
+                    st.success(f"✅ ¡Stock actualizado con éxito! Se sumó {formatear_stock(total_unidades_ingreso)} al modelo '{nombre_prod}'.")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error al actualizar el stock: {e}")
@@ -549,16 +550,16 @@ elif menu == "Reposición de Mercadería":
 # -------------------------------------------------------------
 # 6. ELIMINAR PRODUCTO
 # -------------------------------------------------------------
-elif menu == "Eliminar Producto":
-    st.header("🗑️ Eliminar Producto")
+elif menu == "Eliminar Modelo":
+    st.header("🗑️ Eliminar Modelo")
     engine = conectar_db()
     df_del = pd.read_sql("SELECT id, codigo_interno, nombre FROM productos", engine)
 
     if df_del.empty:
-        st.info("No hay productos.")
+        st.info("No hay modelos registrados.")
     else:
         df_del["op"] = df_del["nombre"] + " [Cod: " + df_del["codigo_interno"] + "]"
-        sel_del = st.selectbox("Selecciona producto a eliminar:", df_del["op"])
+        sel_del = st.selectbox("Selecciona modelo a eliminar:", df_del["op"])
         idx_d = df_del[df_del["op"] == sel_del].index[0]
         id_borrar = df_del.loc[idx_d, "id"]
 
@@ -569,7 +570,7 @@ elif menu == "Eliminar Producto":
                         text("DELETE FROM productos WHERE id = :p_id"),
                         dict(p_id=int(id_borrar)),
                     )
-                st.success("Producto eliminado correctamente.")
+                st.success("Modelo eliminado correctamente.")
                 st.rerun()
             except Exception as e:
                 st.error(f"No se puede eliminar porque tiene historial de ventas asociado: {e}")
