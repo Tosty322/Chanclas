@@ -489,6 +489,29 @@ elif menu == "Historial de Ventas":
         df_hist["tipo_comprobante"] = df_hist["tipo_comprobante"].fillna("Nota de Venta")
         df_hist["numero_comprobante"] = df_hist["numero_comprobante"].fillna("S/N")
         
+        # Preparamos un DataFrame limpio y amigable para la descarga en CSV
+        df_csv = df_hist[[
+            "tipo_comprobante", "numero_comprobante", "fecha_hora", "modelo", 
+            "talla", "docenas_vendidas", "precio_docena", "subtotal", "metodo_pago", "boleta_url"
+        ]].copy()
+        
+        df_csv.columns = [
+            "Tipo Comprobante", "N° Comprobante", "Fecha y Hora", "Modelo", 
+            "Talla", "Docenas Vendidas", "Precio x Docena (S/)", "Importe (S/)", "Método de Pago", "URL Comprobante"
+        ]
+        
+        csv_data = df_csv.to_csv(index=False).encode('utf-8')
+        
+        # Botón para descargar CSV centrado o ubicado estéticamente
+        st.download_button(
+            label="📥 Descargar Historial en CSV",
+            data=csv_data,
+            file_name=f"historial_ventas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv",
+        )
+        
+        st.divider()
+
         for _, row in df_hist.iterrows():
             with st.container(border=True):
                 col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns([0.8, 0.8, 1.2, 1.6, 0.7, 0.8, 1.0, 1.0, 1.3])
