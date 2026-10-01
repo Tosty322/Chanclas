@@ -474,23 +474,34 @@ elif menu == "Historial de Ventas":
     if df_hist.empty:
         st.info("No hay ventas registradas.")
     else:
-        df_hist["n_boleta"] = df_hist["n_boleta"].apply(lambda x: f"#{int(x):04d}")
+        df_hist["n_boleta_fmt"] = df_hist["n_boleta"].apply(lambda x: f"#{int(x):04d}")
+        
+        # Transformamos la columna boleta_url para que aparezca como texto de enlace "Ver boleta"
+        def formatear_enlace_boleta(url):
+            if pd.notna(url) and str(url).strip().startswith("http"):
+                return f"[Ver boleta]({url})"
+            return "Sin comprobante"
+
+        df_hist["comprobante"] = df_hist["boleta_url"].apply(formatear_enlace_boleta)
         
         df_hist_display = df_hist[[
-            "n_boleta", "fecha_hora", "modelo", "talla", 
-            "docenas_vendidas", "precio_docena", "subtotal", "metodo_pago"
+            "n_boleta_fmt", "fecha_hora", "modelo", "talla", 
+            "docenas_vendidas", "precio_docena", "subtotal", "metodo_pago", "comprobante"
         ]].copy()
         
         df_hist_display.columns = [
             "N° Boleta", "Fecha y Hora", "Modelo", "Talla", 
-            "Docenas Vendidas", "Precio x Docena (S/)", "Subtotal (S/)", "Método de Pago"
+            "Docenas Vendidas", "Precio x Docena (S/)", "Subtotal (S/)", "Método de Pago", "Comprobante"
         ]
         
-        st.dataframe(df_hist_display, use_container_width=True)
-
-        for _, row in df_hist.iterrows():
-            if pd.notna(row["boleta_url"]) and row["boleta_url"]:
-                st.write(f"Boleta {row['n_boleta']} - [Ver Comprobante]({row['boleta_url']})")
+        # Mostramos la tabla interactiva que incluye el enlace clickeable "Ver boleta" en cada fila
+        st.dataframe(
+            df_hist_display, 
+            use_container_width=True,
+            column_config={
+                "Comprobante": st.column_config.LinkColumn("Comprobante", display_text="Ver boleta")
+            }
+        )
 
 # -------------------------------------------------------------
 # 5. REPOSICIÓN DE MERCADERÍA
