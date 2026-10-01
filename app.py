@@ -150,7 +150,7 @@ def formatear_stock(total_unidades):
 
 
 # --- MENÚ DE NAVEGACIÓN ---
-st.title("🩴 Sistema de Control y Ventas - Sandalias")
+st.title("🩴 Tienda Lima")
 st.sidebar.title("Menú de Navegación")
 
 menu = st.sidebar.selectbox(
