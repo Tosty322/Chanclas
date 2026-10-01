@@ -606,20 +606,38 @@ elif menu == "Reporte Diario de Ventas":
 
     try:
         with engine.begin() as conn:
-            # Asegurar columnas si faltan en ventas y gastos
+            # 1. Asegurar que la tabla ventas tenga la columna de tarjeta
             conn.execute(text("""
                 DO $$ 
                 BEGIN 
                     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ventas' and column_name='monto_tarjeta') THEN
                         ALTER TABLE ventas ADD COLUMN monto_tarjeta NUMERIC(10,2) DEFAULT 0;
                     END IF;
+                END $$;
+            """))
+
+            # 2. Asegurar que la tabla gastos exista y tenga la columna metodo_pago
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS gastos (
+                    id SERIAL PRIMARY KEY,
+                    fecha_hora TIMESTAMP,
+                    categoria VARCHAR(100),
+                    nota VARCHAR(255),
+                    metodo_pago VARCHAR(50) DEFAULT 'Efectivo',
+                    importe NUMERIC(10, 2)
+                )
+            """))
+            
+            conn.execute(text("""
+                DO $$ 
+                BEGIN 
                     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='gastos' and column_name='metodo_pago') THEN
                         ALTER TABLE gastos ADD COLUMN metodo_pago VARCHAR(50) DEFAULT 'Efectivo';
                     END IF;
                 END $$;
             """))
 
-        # 1. Consultar ventas de la fecha seleccionada
+        # 3. Consultar ventas de la fecha seleccionada
         query_dia = text("""
             SELECT id, fecha_hora, total, metodo_pago, 
                    COALESCE(monto_efectivo, 0) AS monto_efectivo, 
@@ -632,17 +650,14 @@ elif menu == "Reporte Diario de Ventas":
         """)
         df_dia = pd.read_sql(query_dia, engine, params={"f_sel": fecha_str})
 
-        # 2. Consultar gastos de la fecha seleccionada
-        try:
-            query_gastos_dia = text("""
-                SELECT categoria, nota, COALESCE(metodo_pago, 'Efectivo') AS metodo_pago, importe
-                FROM gastos
-                WHERE DATE(fecha_hora) = :f_sel
-                ORDER BY id DESC
-            """)
-            df_gastos_dia = pd.read_sql(query_gastos_dia, engine, params={"f_sel": fecha_str})
-        except Exception:
-            df_gastos_dia = pd.DataFrame(columns=["categoria", "nota", "metodo_pago", "importe"])
+        # 4. Consultar gastos de la fecha seleccionada
+        query_gastos_dia = text("""
+            SELECT categoria, nota, COALESCE(metodo_pago, 'Efectivo') AS metodo_pago, importe
+            FROM gastos
+            WHERE DATE(fecha_hora) = :f_sel
+            ORDER BY id DESC
+        """)
+        df_gastos_dia = pd.read_sql(query_gastos_dia, engine, params={"f_sel": fecha_str})
 
         st.markdown(f"### 📈 Resumen Financiero del Día: **{fecha_seleccionada.strftime('%d/%m/%Y')}**")
 
@@ -703,7 +718,7 @@ elif menu == "Reporte Diario de Ventas":
         with col_f3:
             st.metric(label="💳 Saldo Tarjeta", value=f"S/ {neto_tarjeta:.2f}", delta=f"S/ {neto_tarjeta:.2f}")
         with col_f4:
-            st.metric(label="⚖️ Balance Neto Total", value=f"S/ {balance_neto:.2f}")
+            st.metric(label="⚖️️ Balance Neto Total", value=f"S/ {balance_neto:.2f}")
 
         st.divider()
 
