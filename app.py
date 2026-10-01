@@ -459,7 +459,8 @@ elif menu == "Historial de Ventas":
             v.fecha_hora,
             p.nombre AS sandalia,
             p.talla,
-            dv.cantidad AS docenas,
+            dv.cantidad AS docenas_vendidas,
+            dv.precio_unitario AS precio_docena,
             dv.subtotal,
             v.metodo_pago,
             v.boleta_url
@@ -474,7 +475,19 @@ elif menu == "Historial de Ventas":
         st.info("No hay ventas registradas.")
     else:
         df_hist["n_boleta"] = df_hist["n_boleta"].apply(lambda x: f"#{int(x):04d}")
-        st.dataframe(df_hist, use_container_width=True)
+        
+        # Renombramos columnas para que se vean más amigables en pantalla
+        df_hist_display = df_hist[[
+            "n_boleta", "fecha_hora", "sandalia", "talla", 
+            "docenas_vendidas", "precio_docena", "subtotal", "metodo_pago"
+        ]].copy()
+        
+        df_hist_display.columns = [
+            "N° Boleta", "Fecha y Hora", "Sandalia", "Talla", 
+            "Docenas Vendidas", "Precio x Docena (S/)", "Subtotal (S/)", "Método de Pago"
+        ]
+        
+        st.dataframe(df_hist_display, use_container_width=True)
 
         for _, row in df_hist.iterrows():
             if pd.notna(row["boleta_url"]) and row["boleta_url"]:
@@ -496,7 +509,7 @@ elif menu == "Reposición de Mercadería":
     if df_reposicion.empty:
         st.success(f"🎉 ¡Todo en orden! No hay sandalias con stock menor o igual a {limite_docenas} docenas.")
     else:
-        st.warning(f"⚠️ Se encontraron {len(df_reposicion)} productos con stock bajo.")
+        st.warning(f"⚠️️ Se encontraron {len(df_reposicion)} productos con stock bajo.")
         
         df_reposicion["stock_formateado"] = df_reposicion["stock"].apply(formatear_stock)
         st.dataframe(df_reposicion[["codigo_interno", "nombre", "categoria", "talla", "stock_formateado", "precio_compra"]], use_container_width=True)
