@@ -174,7 +174,6 @@ if menu == "Inventario Actual":
 
     busqueda_inv = st.text_input("🔍 Buscar modelo por nombre o código:")
     
-    # Consulta segura usando parámetros para evitar errores de sintaxis o SQL injection
     if busqueda_inv:
         query = text("SELECT * FROM productos WHERE nombre ILIKE :busqueda OR codigo_interno ILIKE :busqueda ORDER BY id DESC")
         df_productos = pd.read_sql(query, engine, params={"busqueda": f"%{busqueda_inv}%"})
@@ -492,7 +491,8 @@ elif menu == "Historial de Ventas":
         
         for _, row in df_hist.iterrows():
             with st.container(border=True):
-                col1, col2, col3, col4, col5, col6, col7 = st.columns([1, 1, 1.5, 1.5, 1, 1.2, 1.5])
+                # Distribuimos el espacio en 8 columnas para separar modelo, talla y precio por docena
+                col1, col2, col3, col4, col5, col6, col7, col8 = st.columns([0.9, 0.9, 1.2, 1.8, 0.8, 0.9, 0.9, 1.3])
                 
                 with col1:
                     st.markdown(f"**Tipo:**<br>{row['tipo_comprobante']}", unsafe_allow_html=True)
@@ -501,12 +501,14 @@ elif menu == "Historial de Ventas":
                 with col3:
                     st.markdown(f"**Fecha:**<br>{row['fecha_hora']}", unsafe_allow_html=True)
                 with col4:
-                    st.markdown(f"**Modelo / Talla:**<br>{row['modelo']} (T: {row['talla']})", unsafe_allow_html=True)
+                    st.markdown(f"**Modelo:**<br>{row['modelo']}", unsafe_allow_html=True)
                 with col5:
-                    st.markdown(f"**Docenas:**<br>{row['docenas_vendidas']}", unsafe_allow_html=True)
+                    st.markdown(f"**Talla:**<br>{row['talla']}", unsafe_allow_html=True)
                 with col6:
-                    st.markdown(f"**Subtotal:**<br>S/ {row['subtotal']:.2f}", unsafe_allow_html=True)
+                    st.markdown(f"**Docenas:**<br>{row['docenas_vendidas']}", unsafe_allow_html=True)
                 with col7:
+                    st.markdown(f"**Precio x Doc:**<br>S/ {row['precio_docena']:.2f}", unsafe_allow_html=True)
+                with col8:
                     st.markdown("**Comprobante:**")
                     url = str(row['boleta_url']).strip()
                     if url and url not in ["", "None", "nan", "NaN", "null", "0"] and url.startswith("http"):
