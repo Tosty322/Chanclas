@@ -303,10 +303,6 @@ elif menu == "Registrar Gasto":
             ]
         )
 
-        nota_opcional = ""
-        if categoria_gasto == "otros":
-            nota_opcional = st.text_input("Nota opcional (Detalle de 'otros')")
-
         col_g1, col_g2 = st.columns(2)
         with col_g1:
             importe_gasto = st.number_input("Importe del Gasto (S/)", min_value=0.0, format="%.2f", step=1.0)
@@ -326,7 +322,6 @@ elif menu == "Registrar Gasto":
                             id SERIAL PRIMARY KEY,
                             fecha_hora TIMESTAMP,
                             categoria VARCHAR(100),
-                            nota VARCHAR(255),
                             metodo_pago VARCHAR(50) DEFAULT 'Efectivo',
                             importe NUMERIC(10, 2)
                         )
@@ -334,13 +329,12 @@ elif menu == "Registrar Gasto":
                     
                     conn.execute(
                         text("""
-                            INSERT INTO gastos (fecha_hora, categoria, nota, metodo_pago, importe)
-                            VALUES (:f_h, :cat, :nota, :m_p, :imp)
+                            INSERT INTO gastos (fecha_hora, categoria, metodo_pago, importe)
+                            VALUES (:f_h, :cat, :m_p, :imp)
                         """),
                         dict(
                             f_h=fecha_actual,
                             cat=categoria_gasto,
-                            nota=nota_opcional,
                             m_p=metodo_pago_gasto,
                             imp=float(importe_gasto)
                         )
@@ -353,11 +347,11 @@ elif menu == "Registrar Gasto":
     st.subheader("📋 Historial de Gastos Recientes")
     try:
         engine = conectar_db()
-        df_gastos = pd.read_sql(text("SELECT fecha_hora, categoria, metodo_pago, nota, importe FROM gastos ORDER BY id DESC LIMIT 20"), engine)
+        df_gastos = pd.read_sql(text("SELECT fecha_hora, categoria, metodo_pago, importe FROM gastos ORDER BY id DESC LIMIT 20"), engine)
         if df_gastos.empty:
             st.info("No hay gastos registrados todavía.")
         else:
-            df_gastos.columns = ["Fecha y Hora", "Categoría", "Método de Pago", "Nota Opcional", "Importe (S/)"]
+            df_gastos.columns = ["Fecha y Hora", "Categoría", "Método de Pago", "Importe (S/)"]
             st.dataframe(df_gastos, use_container_width=True)
     except Exception:
         st.info("Aún no se ha creado la tabla de gastos en la base de datos.")
@@ -763,7 +757,7 @@ elif menu == "Reporte Diario de Ventas":
         df_dia = pd.read_sql(query_dia, engine, params={"f_sel": fecha_str})
 
         query_gastos_dia = text("""
-            SELECT categoria, nota, COALESCE(metodo_pago, 'Efectivo') AS metodo_pago, importe
+            SELECT categoria, COALESCE(metodo_pago, 'Efectivo') AS metodo_pago, importe
             FROM gastos
             WHERE DATE(fecha_hora) = :f_sel
             ORDER BY id DESC
@@ -840,8 +834,8 @@ elif menu == "Reporte Diario de Ventas":
             if df_gastos_dia.empty:
                 st.info("No hay gastos registrados en esta fecha.")
             else:
-                df_gastos_disp = df_gastos_dia[["categoria", "metodo_pago", "nota", "importe"]].copy()
-                df_gastos_disp.columns = ["Categoría", "Pago con", "Nota", "Importe (S/)"]
+                df_gastos_disp = df_gastos_dia[["categoria", "metodo_pago", "importe"]].copy()
+                df_gastos_disp.columns = ["Categoría", "Pago con", "Importe (S/)"]
                 st.dataframe(df_gastos_disp, use_container_width=True)
 
     except Exception as e:
