@@ -580,7 +580,7 @@ elif menu == "Historial de Ventas":
                         st.markdown(f"{estilo}<b>Comprobante:</b><br><span style='color: #9CA3AF;'>No adjunto</span>{cierre}", unsafe_allow_html=True)
 
 # -------------------------------------------------------------
-# 5. REGISTRAR GASTO (NUEVA SECCIÓN)
+# 5. REGISTRAR GASTO
 # -------------------------------------------------------------
 elif menu == "Registrar Gasto":
     st.header("💸 Registro de Gastos Operativos")
@@ -630,12 +630,12 @@ elif menu == "Registrar Gasto":
                     conn.execute(
                         text("""
                             INSERT INTO gastos (fecha_hora, categoria, nota, importe)
-                            VALUES (:f_h, :cat, :not, :imp)
+                            VALUES (:f_h, :cat, :nota, :imp)
                         """),
                         dict(
                             f_h=fecha_actual,
                             cat=categoria_gasto,
-                            not=nota_opcional,
+                            nota=nota_opcional,
                             imp=float(importe_gasto)
                         )
                     )
