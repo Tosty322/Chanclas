@@ -597,7 +597,7 @@ elif menu == "Historial de Ventas":
 # 5. REPORTE DIARIO DE VENTAS
 # -------------------------------------------------------------
 elif menu == "Reporte Diario de Ventas":
-    st.header("📅 Reporte Diario y Balance Financiero")
+    st.header("📅 Reporte Diario y Control de Flujo de Dinero")
     engine = conectar_db()
 
     # Selector de fecha interactivo
@@ -606,12 +606,15 @@ elif menu == "Reporte Diario de Ventas":
 
     try:
         with engine.begin() as conn:
-            # Asegurar columnas si faltan en ventas
+            # Asegurar columnas si faltan en ventas y gastos
             conn.execute(text("""
                 DO $$ 
                 BEGIN 
                     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ventas' and column_name='monto_tarjeta') THEN
                         ALTER TABLE ventas ADD COLUMN monto_tarjeta NUMERIC(10,2) DEFAULT 0;
+                    END IF;
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='gastos' and column_name='metodo_pago') THEN
+                        ALTER TABLE gastos ADD COLUMN metodo_pago VARCHAR(50) DEFAULT 'Efectivo';
                     END IF;
                 END $$;
             """))
@@ -629,84 +632,100 @@ elif menu == "Reporte Diario de Ventas":
         """)
         df_dia = pd.read_sql(query_dia, engine, params={"f_sel": fecha_str})
 
-        # 2. Consultar gastos de la fecha seleccionada (con manejo seguro por si la tabla aún no existe)
+        # 2. Consultar gastos de la fecha seleccionada
         try:
             query_gastos_dia = text("""
-                SELECT categoria, nota, importe
+                SELECT categoria, nota, COALESCE(metodo_pago, 'Efectivo') AS metodo_pago, importe
                 FROM gastos
                 WHERE DATE(fecha_hora) = :f_sel
                 ORDER BY id DESC
             """)
             df_gastos_dia = pd.read_sql(query_gastos_dia, engine, params={"f_sel": fecha_str})
         except Exception:
-            df_gastos_dia = pd.DataFrame(columns=["categoria", "nota", "importe"])
+            df_gastos_dia = pd.DataFrame(columns=["categoria", "nota", "metodo_pago", "importe"])
 
         st.markdown(f"### 📈 Resumen Financiero del Día: **{fecha_seleccionada.strftime('%d/%m/%Y')}**")
 
-        # Cálculos de Ingresos
-        total_efectivo = df_dia["monto_efectivo"].sum() if not df_dia.empty else 0.0
-        total_yape = df_dia["monto_yape"].sum() if not df_dia.empty else 0.0
-        total_tarjeta = df_dia["monto_tarjeta"].sum() if not df_dia.empty else 0.0
-        total_general_ventas = df_dia["total"].sum() if not df_dia.empty else 0.0
+        # --- INGRESOS ---
+        ing_efectivo = df_dia["monto_efectivo"].sum() if not df_dia.empty else 0.0
+        ing_yape = df_dia["monto_yape"].sum() if not df_dia.empty else 0.0
+        ing_tarjeta = df_dia["monto_tarjeta"].sum() if not df_dia.empty else 0.0
+        total_ingresos = df_dia["total"].sum() if not df_dia.empty else 0.0
 
-        st.subheader("💵 Ingresos por Método de Pago")
+        st.subheader("💵 1. Ingresos por Ventas")
         col_m1, col_m2, col_m3, col_m4 = st.columns(4)
         with col_m1:
-            st.metric(label="💵 Efectivo", value=f"S/ {total_efectivo:.2f}")
+            st.metric(label="💵 Efectivo", value=f"S/ {ing_efectivo:.2f}")
         with col_m2:
-            st.metric(label="📱 Yape / Plin", value=f"S/ {total_yape:.2f}")
+            st.metric(label="📱 Yape / Plin", value=f"S/ {ing_yape:.2f}")
         with col_m3:
-            st.metric(label="💳 Tarjeta", value=f"S/ {total_tarjeta:.2f}")
+            st.metric(label="💳 Tarjeta", value=f"S/ {ing_tarjeta:.2f}")
         with col_m4:
-            st.metric(label="💰 Total Ingresos", value=f"S/ {total_general_ventas:.2f}")
+            st.metric(label="💰 Total Ingresos", value=f"S/ {total_ingresos:.2f}")
 
-        st.divider()
-
-        # Cálculos de Gastos
-        total_general_gastos = df_gastos_dia["importe"].sum() if not df_gastos_dia.empty else 0.0
-        st.subheader("💸 Gastos Operativos del Día")
-        
-        if df_gastos_dia.empty:
-            st.info("No se registraron gastos en esta fecha o la tabla de gastos aún no ha sido creada (puedes registrar uno en el menú 'Registrar Gasto').")
-            gastos_por_categoria = pd.Series(dtype=float)
+        # --- GASTOS POR MÉTODO DE PAGO ---
+        if not df_gastos_dia.empty and "metodo_pago" in df_gastos_dia.columns:
+            gasto_efectivo = df_gastos_dia[df_gastos_dia["metodo_pago"] == "Efectivo"]["importe"].sum()
+            gasto_yape = df_gastos_dia[df_gastos_dia["metodo_pago"] == "Yape / Plin"]["importe"].sum()
+            gasto_tarjeta = df_gastos_dia[df_gastos_dia["metodo_pago"] == "Tarjeta"]["importe"].sum()
+            total_gastos = df_gastos_dia["importe"].sum()
         else:
-            # Agrupar gastos por categoría para mostrarlos por separado
-            gastos_por_categoria = df_gastos_dia.groupby("categoria")["importe"].sum()
-            
-            # Mostrar métricas ordenadas por categoría de gasto
-            cols_gastos = st.columns(min(len(gastos_por_categoria), 4) if len(gastos_por_categoria) > 0 else 1)
-            for i, (cat, imp) in enumerate(gastos_por_categoria.items()):
-                with cols_gastos[i % len(cols_gastos)]:
-                    st.metric(label=f"🏷️ {cat.capitalize()}", value=f"S/ {imp:.2f}")
+            gasto_efectivo = 0.0
+            gasto_yape = 0.0
+            gasto_tarjeta = 0.0
+            total_gastos = 0.0
 
-            st.markdown(f"**Total Gastos del Día:** S/ {total_general_gastos:.2f}")
-            with st.expander("Ver detalle individual de gastos"):
-                df_gastos_display = df_gastos_dia.copy()
-                df_gastos_display.columns = ["Categoría", "Nota Opcional", "Importe (S/)"]
-                st.dataframe(df_gastos_display, use_container_width=True)
+        st.subheader("💸 2. Gastos Operativos")
+        col_g1, col_g2, col_g3, col_g4 = st.columns(4)
+        with col_g1:
+            st.metric(label="📤 Gastos en Efectivo", value=f"S/ {gasto_efectivo:.2f}")
+        with col_g2:
+            st.metric(label="📤 Gastos en Yape/Plin", value=f"S/ {gasto_yape:.2f}")
+        with col_g3:
+            st.metric(label="📤 Gastos en Tarjeta", value=f"S/ {gasto_tarjeta:.2f}")
+        with col_g4:
+            st.metric(label="📉 Total Gastos", value=f"S/ {total_gastos:.2f}")
+
+        st.divider()
+
+        # --- CONTROL DE FLUJO DE DINERO (NETO EN CAJA/CUENTAS) ---
+        neto_efectivo = ing_efectivo - gasto_efectivo
+        neto_yape = ing_yape - gasto_yape
+        neto_tarjeta = ing_tarjeta - gasto_tarjeta
+        balance_neto = total_ingresos - total_gastos
+
+        st.subheader("🎯 3. Control de Flujo de Dinero (Cuánto debes tener disponible)")
+        col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+        with col_f1:
+            st.metric(label="🪙 Efectivo en Caja", value=f"S/ {neto_efectivo:.2f}", delta=f"S/ {neto_efectivo:.2f}")
+        with col_f2:
+            st.metric(label="📱 Saldo Yape / Plin", value=f"S/ {neto_yape:.2f}", delta=f"S/ {neto_yape:.2f}")
+        with col_f3:
+            st.metric(label="💳 Saldo Tarjeta", value=f"S/ {neto_tarjeta:.2f}", delta=f"S/ {neto_tarjeta:.2f}")
+        with col_f4:
+            st.metric(label="⚖️ Balance Neto Total", value=f"S/ {balance_neto:.2f}")
 
         st.divider()
 
-        # Balance Total (Ingresos - Gastos)
-        balance_total = total_general_ventas - total_general_gastos
-        st.subheader("⚖️ Balance Total del Día")
-        
-        col_b1, col_b2, col_b3 = st.columns(3)
-        with col_b1:
-            st.metric(label="➕ Total Ingresos", value=f"S/ {total_general_ventas:.2f}")
-        with col_b2:
-            st.metric(label="➖ Total Gastos", value=f"S/ {total_general_gastos:.2f}")
-        with col_b3:
-            st.metric(label="🎯 Balance Neto (Ganancia / Pérdida)", value=f"S/ {balance_total:.2f}", delta=f"S/ {balance_total:.2f}")
+        # --- DETALLES DE TABLAS ---
+        col_t1, col_t2 = st.columns(2)
+        with col_t1:
+            st.markdown("#### 📝 Ventas del Día")
+            if df_dia.empty:
+                st.info("No hay ventas registradas en esta fecha.")
+            else:
+                df_dia_disp = df_dia[["fecha_hora", "tipo_comprobante", "numero_comprobante", "metodo_pago", "total"]].copy()
+                df_dia_disp.columns = ["Hora", "Tipo", "N°", "Método", "Total (S/)"]
+                st.dataframe(df_dia_disp, use_container_width=True)
 
-        st.divider()
-        st.subheader(f"📝 Detalle de Transacciones (Ventas) del {fecha_seleccionada.strftime('%d/%m/%Y')}")
-        if df_dia.empty:
-            st.info("No hay ventas registradas en esta fecha.")
-        else:
-            df_dia_display = df_dia[["fecha_hora", "tipo_comprobante", "numero_comprobante", "metodo_pago", "monto_efectivo", "monto_yape", "monto_tarjeta", "total"]].copy()
-            df_dia_display.columns = ["Fecha y Hora", "Tipo Comprobante", "N° Comprobante", "Método Pago", "Efectivo (S/)", "Yape/Plin (S/)", "Tarjeta (S/)", "Total (S/)"]
-            st.dataframe(df_dia_display, use_container_width=True)
+        with col_t2:
+            st.markdown("#### 📋 Gastos del Día")
+            if df_gastos_dia.empty:
+                st.info("No hay gastos registrados en esta fecha.")
+            else:
+                df_gastos_disp = df_gastos_dia[["categoria", "metodo_pago", "nota", "importe"]].copy()
+                df_gastos_disp.columns = ["Categoría", "Pago con", "Nota", "Importe (S/)"]
+                st.dataframe(df_gastos_disp, use_container_width=True)
 
     except Exception as e:
         st.error(f"Error al cargar el reporte diario y balance: {e}")
@@ -738,7 +757,11 @@ elif menu == "Registrar Gasto":
         if categoria_gasto == "otros":
             nota_opcional = st.text_input("Nota opcional (Detalle de 'otros')")
 
-        importe_gasto = st.number_input("Importe del Gasto (S/)", min_value=0.0, format="%.2f", step=1.0)
+        col_g1, col_g2 = st.columns(2)
+        with col_g1:
+            importe_gasto = st.number_input("Importe del Gasto (S/)", min_value=0.0, format="%.2f", step=1.0)
+        with col_g2:
+            metodo_pago_gasto = st.selectbox("¿De dónde salió el dinero para el gasto?", ["Efectivo", "Yape / Plin", "Tarjeta"])
         
         btn_guardar_gasto = st.form_submit_button("Guardar Gasto")
 
@@ -748,30 +771,42 @@ elif menu == "Registrar Gasto":
                 fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 
                 with engine.begin() as conn:
-                    # Crear tabla de gastos automáticamente si no existe con la columna 'nota'
+                    # Crear tabla de gastos automáticamente si no existe con metodo_pago
                     conn.execute(text("""
                         CREATE TABLE IF NOT EXISTS gastos (
                             id SERIAL PRIMARY KEY,
                             fecha_hora TIMESTAMP,
                             categoria VARCHAR(100),
                             nota VARCHAR(255),
+                            metodo_pago VARCHAR(50) DEFAULT 'Efectivo',
                             importe NUMERIC(10, 2)
                         )
                     """))
                     
+                    # Asegurar la columna si la tabla ya existía sin ella
+                    conn.execute(text("""
+                        DO $$ 
+                        BEGIN 
+                            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='gastos' and column_name='metodo_pago') THEN
+                                ALTER TABLE gastos ADD COLUMN metodo_pago VARCHAR(50) DEFAULT 'Efectivo';
+                            END IF;
+                        END $$;
+                    """))
+                    
                     conn.execute(
                         text("""
-                            INSERT INTO gastos (fecha_hora, categoria, nota, importe)
-                            VALUES (:f_h, :cat, :nota, :imp)
+                            INSERT INTO gastos (fecha_hora, categoria, nota, metodo_pago, importe)
+                            VALUES (:f_h, :cat, :nota, :m_p, :imp)
                         """),
                         dict(
                             f_h=fecha_actual,
                             cat=categoria_gasto,
                             nota=nota_opcional,
+                            m_p=metodo_pago_gasto,
                             imp=float(importe_gasto)
                         )
                     )
-                st.success(f"✅ Gasto de **S/ {importe_gasto:.2f}** en la categoría '{categoria_gasto}' registrado con éxito.")
+                st.success(f"✅ Gasto de **S/ {importe_gasto:.2f}** ({categoria_gasto}) pagado con **{metodo_pago_gasto}** registrado con éxito.")
             except Exception as e:
                 st.error(f"Error al registrar el gasto: {e}")
 
@@ -780,11 +815,11 @@ elif menu == "Registrar Gasto":
     st.subheader("📋 Historial de Gastos Recientes")
     try:
         engine = conectar_db()
-        df_gastos = pd.read_sql(text("SELECT fecha_hora, categoria, nota, importe FROM gastos ORDER BY id DESC LIMIT 20"), engine)
+        df_gastos = pd.read_sql(text("SELECT fecha_hora, categoria, metodo_pago, nota, importe FROM gastos ORDER BY id DESC LIMIT 20"), engine)
         if df_gastos.empty:
             st.info("No hay gastos registrados todavía.")
         else:
-            df_gastos.columns = ["Fecha y Hora", "Categoría", "Nota Opcional", "Importe (S/)"]
+            df_gastos.columns = ["Fecha y Hora", "Categoría", "Método de Pago", "Nota Opcional", "Importe (S/)"]
             st.dataframe(df_gastos, use_container_width=True)
     except Exception:
         st.info("Aún no se ha creado la tabla de gastos en la base de datos (se creará al registrar el primer gasto).")
