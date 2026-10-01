@@ -616,7 +616,7 @@ elif menu == "Registrar Gasto":
                 fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 
                 with engine.begin() as conn:
-                    # Crear tabla de gastos automáticamente si no existe
+                    # Crear tabla de gastos automáticamente si no existe con la columna 'nota'
                     conn.execute(text("""
                         CREATE TABLE IF NOT EXISTS gastos (
                             id SERIAL PRIMARY KEY,
