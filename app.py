@@ -199,6 +199,26 @@ if menu == "Inventario Actual":
     if df_productos.empty:
         st.info("No hay modelos registrados.")
     else:
+        # Preparamos el DataFrame limpio para la descarga en CSV del inventario
+        df_inv_csv = df_productos[[
+            "codigo_interno", "nombre", "categoria", "origen", "talla", "stock", "precio_venta", "precio_compra", "apuntes", "foto_url"
+        ]].copy()
+        
+        df_inv_csv.columns = [
+            "Código Interno", "Modelo", "Categoría", "Origen", "Talla", "Stock (Unidades)", "Precio Venta x Docena (S/)", "Costo x Docena (S/)", "Apuntes", "URL Foto"
+        ]
+        
+        csv_inventario = df_inv_csv.to_csv(index=False).encode('utf-8')
+        
+        st.download_button(
+            label="📥 Descargar Inventario en CSV",
+            data=csv_inventario,
+            file_name=f"inventario_actual_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv",
+        )
+        
+        st.divider()
+
         for _, row in df_productos.iterrows():
             with st.container(border=True):
                 col_info1, col_info2, col_info3, col_info4, col_img = st.columns([2.5, 1.8, 1.5, 1.5, 1.2])
@@ -489,7 +509,6 @@ elif menu == "Historial de Ventas":
         df_hist["tipo_comprobante"] = df_hist["tipo_comprobante"].fillna("Nota de Venta")
         df_hist["numero_comprobante"] = df_hist["numero_comprobante"].fillna("S/N")
         
-        # Preparamos un DataFrame limpio y amigable para la descarga en CSV
         df_csv = df_hist[[
             "tipo_comprobante", "numero_comprobante", "fecha_hora", "modelo", 
             "talla", "docenas_vendidas", "precio_docena", "subtotal", "metodo_pago", "boleta_url"
@@ -502,7 +521,6 @@ elif menu == "Historial de Ventas":
         
         csv_data = df_csv.to_csv(index=False).encode('utf-8')
         
-        # Botón para descargar CSV centrado o ubicado estéticamente
         st.download_button(
             label="📥 Descargar Historial en CSV",
             data=csv_data,
