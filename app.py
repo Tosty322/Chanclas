@@ -17,7 +17,7 @@ st.set_page_config(
 # --- ESTILO VISUAL PERSONALIZADO (CSS) ---
 st.markdown("""
     <style>
-    /* Ocultar únicamente el pie de página predeterminado de Streamlit */
+    /* Ocultar únicamente el pie de página predeterminado de streamlit */
     footer {visibility: hidden;}
 
     /* Estilo general para los títulos */
@@ -124,10 +124,6 @@ def comprimir_imagen(imagen_subida, max_ancho=600, calidad=65):
 
 # --- PROCESAMIENTO Y COMPRESIÓN DE BOLETAS (Escala de grises + Contraste alto) ---
 def procesar_imagen_boleta(imagen_subida, max_ancho=800, factor_contraste=1.8):
-    """
-    Convierte la boleta a escala de grises, aumenta el contraste para oscurecer
-    el texto y blanquear el fondo, y reduce su peso para optimizar almacenamiento.
-    """
     img = Image.open(imagen_subida)
     
     if img.mode in ("RGBA", "P"):
@@ -138,10 +134,7 @@ def procesar_imagen_boleta(imagen_subida, max_ancho=800, factor_contraste=1.8):
         nuevo_alto = int(img.height * proporcion)
         img = img.resize((max_ancho, nuevo_alto), Image.Resampling.LANCZOS)
 
-    # 1. Convertir a escala de grises
     img_gris = img.convert("L")
-
-    # 2. Aumentar el contraste para limpiar el fondo y oscurecer la letra
     enhancer = ImageEnhance.Contrast(img_gris)
     img_contraste = enhancer.enhance(factor_contraste)
 
@@ -189,6 +182,7 @@ menu = st.sidebar.selectbox(
         "Inventario Actual",
         "Registrar Gasto",
         "Registrar Venta (POS)",
+        "Pendientes a Cobrar",
         "Reporte Diario de Ventas",
         "Historial de Ventas",
         "Reposición de Mercadería",
@@ -317,7 +311,7 @@ elif menu == "Registrar Gasto":
         with col_g1:
             importe_gasto = st.number_input("Importe del Gasto (S/)", min_value=0.0, format="%.2f", step=1.0)
         with col_g2:
-            metodo_pago_gasto = st.selectbox("¿De dónde salió el dinero para el gasto?", ["Efectivo", "Yape / Plin", "Tarjeta"])
+            metodo_pago_gasto = st.selectbox("¿De dónde salió el dinero para el gasto?", ["Efectivo", "Yape / Plin"])
         
         btn_guardar_gasto = st.form_submit_button("Guardar Gasto")
 
@@ -336,15 +330,6 @@ elif menu == "Registrar Gasto":
                             metodo_pago VARCHAR(50) DEFAULT 'Efectivo',
                             importe NUMERIC(10, 2)
                         )
-                    """))
-                    
-                    conn.execute(text("""
-                        DO $$ 
-                        BEGIN 
-                            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='gastos' and column_name='metodo_pago') THEN
-                                ALTER TABLE gastos ADD COLUMN metodo_pago VARCHAR(50) DEFAULT 'Efectivo';
-                            END IF;
-                        END $$;
                     """))
                     
                     conn.execute(
@@ -375,7 +360,7 @@ elif menu == "Registrar Gasto":
             df_gastos.columns = ["Fecha y Hora", "Categoría", "Método de Pago", "Nota Opcional", "Importe (S/)"]
             st.dataframe(df_gastos, use_container_width=True)
     except Exception:
-        st.info("Aún no se ha creado la tabla de gastos en la base de datos (se creará al registrar el primer gasto).")
+        st.info("Aún no se ha creado la tabla de gastos en la base de datos.")
 
 # -------------------------------------------------------------
 # 3. REGISTRAR VENTA (POS)
@@ -464,17 +449,52 @@ elif menu == "Registrar Venta (POS)":
             with col_p2:
                 numero_comprobante = st.text_input("N° de Talonario / Comprobante", placeholder="Ej: B001-00123")
             with col_p3:
-                metodo_pago = st.selectbox("Método de pago", ["Efectivo", "Yape / Plin", "Tarjeta"])
+                metodo_pago = st.selectbox(
+                    "Método de pago", 
+                    [
+                        "Efectivo", 
+                        "Yape / Plin", 
+                        "Efectivo y Yape/Plin (Combinado)", 
+                        "Crédito", 
+                        "Crédito y Yape/Plin", 
+                        "Crédito y Efectivo"
+                    ]
+                )
 
-            monto_yape = 0.0
             monto_efectivo = 0.0
-            monto_tarjeta = 0.0
-            if metodo_pago == "Yape / Plin":
-                monto_yape = total_original
-            elif metodo_pago == "Tarjeta":
-                monto_tarjeta = total_original
-            else:
+            monto_yape = 0.0
+            monto_credito = 0.0
+
+            if metodo_pago == "Efectivo":
                 monto_efectivo = total_original
+            elif metodo_pago == "Yape / Plin":
+                monto_yape = total_original
+            elif metodo_pago == "Crédito":
+                monto_credito = total_original
+            elif metodo_pago == "Efectivo y Yape/Plin (Combinado)":
+                st.markdown("#### 🔀 Detalle de Combinación")
+                col_m1, col_m2 = st.columns(2)
+                with col_m1:
+                    monto_efectivo = st.number_input("Monto en Efectivo (S/)", min_value=0.0, max_value=float(total_original), value=float(total_original)/2, format="%.2f")
+                with col_m2:
+                    monto_yape = round(total_original - monto_efectivo, 2)
+                    st.metric("Monto en Yape / Plin (Automático)", value=f"S/ {monto_yape:.2f}")
+            elif metodo_pago == "Crédito y Yape/Plin":
+                st.markdown("#### 🔀 Detalle de Crédito + Yape/Plin")
+                col_m1, col_m2 = st.columns(2)
+                with col_m1:
+                    monto_yape = st.number_input("Monto pagado por Yape/Plin (S/)", min_value=0.0, max_value=float(total_original), value=0.0, format="%.2f")
+                with col_m2:
+                    monto_credito = round(total_original - monto_yape, 2)
+                    st.metric("Monto restante al Crédito (Automático)", value=f"S/ {monto_credito:.2f}")
+            elif metodo_pago == "Crédito y Efectivo":
+                st.markdown("#### 🔀 Detalle de Crédito + Efectivo")
+                col_m1, col_m2 = st.columns(2)
+                with col_m1:
+                    monto_efectivo = st.number_input("Monto pagado en Efectivo (S/)", min_value=0.0, max_value=float(total_original), value=0.0, format="%.2f")
+                with col_m2:
+                    monto_credito = round(total_original - monto_efectivo, 2)
+                    st.metric("Monto restante al Crédito (Automático)", value=f"S/ {monto_credito:.2f}")
 
             boleta_subida = st.file_uploader("Foto de la Boleta / Comprobante (Opcional)", type=["jpg", "jpeg", "png", "webp"])
 
@@ -484,7 +504,6 @@ elif menu == "Registrar Venta (POS)":
                     boleta_url = ""
                     if boleta_subida is not None:
                         with st.spinner("Procesando y subiendo comprobante..."):
-                            # SE CAMBIÓ A LA FUNCIÓN DE ESCALA DE GRISES Y CONTRASTE
                             img_comp = procesar_imagen_boleta(boleta_subida)
                             nombre_bol = f"boleta_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
                             boleta_url = subir_a_supabase(img_comp, nombre_bol, "boletas")
@@ -492,24 +511,31 @@ elif menu == "Registrar Venta (POS)":
                     try:
                         fecha_venta = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         with engine.begin() as conn:
+                            # Asegurar columnas necesarias en la tabla ventas
                             conn.execute(text("""
                                 DO $$ 
                                 BEGIN 
-                                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ventas' and column_name='monto_tarjeta') THEN
-                                        ALTER TABLE ventas ADD COLUMN monto_tarjeta NUMERIC(10,2) DEFAULT 0;
+                                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ventas' and column_name='monto_credito') THEN
+                                        ALTER TABLE ventas ADD COLUMN monto_credito NUMERIC(10,2) DEFAULT 0;
+                                    END IF;
+                                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ventas' and column_name='monto_yape') THEN
+                                        ALTER TABLE ventas ADD COLUMN monto_yape NUMERIC(10,2) DEFAULT 0;
+                                    END IF;
+                                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ventas' and column_name='monto_efectivo') THEN
+                                        ALTER TABLE ventas ADD COLUMN monto_efectivo NUMERIC(10,2) DEFAULT 0;
                                     END IF;
                                 END $$;
                             """))
 
                             res = conn.execute(
                                 text("""
-                                    INSERT INTO ventas (fecha_hora, total, metodo_pago, monto_yape, monto_efectivo, monto_tarjeta, boleta_url, tipo_comprobante, numero_comprobante)
-                                    VALUES (:f_h, :tot, :m_p, :m_y, :m_e, :m_t, :b_url, :t_comp, :n_comp)
+                                    INSERT INTO ventas (fecha_hora, total, metodo_pago, monto_yape, monto_efectivo, monto_credito, boleta_url, tipo_comprobante, numero_comprobante)
+                                    VALUES (:f_h, :tot, :m_p, :m_y, :m_e, :m_c, :b_url, :t_comp, :n_comp)
                                     RETURNING id
                                 """),
                                 dict(
                                     f_h=fecha_venta, tot=float(total_original), m_p=metodo_pago,
-                                    m_y=float(monto_yape), m_e=float(monto_efectivo), m_t=float(monto_tarjeta),
+                                    m_y=float(monto_yape), m_e=float(monto_efectivo), m_c=float(monto_credito),
                                     b_url=boleta_url, t_comp=tipo_comprobante, n_comp=numero_comprobante,
                                 ),
                             )
@@ -542,7 +568,73 @@ elif menu == "Registrar Venta (POS)":
                     st.rerun()
 
 # -------------------------------------------------------------
-# 4. REPORTE DIARIO DE VENTAS
+# 4. PENDIENTES A COBRAR
+# -------------------------------------------------------------
+elif menu == "Pendientes a Cobrar":
+    st.header("📋 Ventas Pendientes de Cobro (Créditos / Fiados)")
+    engine = conectar_db()
+
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("""
+                DO $$ 
+                BEGIN 
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ventas' and column_name='monto_credito') THEN
+                        ALTER TABLE ventas ADD COLUMN monto_credito NUMERIC(10,2) DEFAULT 0;
+                    END IF;
+                END $$;
+            """))
+
+        query_pendientes = text("""
+            SELECT id, fecha_hora, tipo_comprobante, numero_comprobante, total, 
+                   COALESCE(monto_efectivo, 0) AS monto_efectivo, 
+                   COALESCE(monto_yape, 0) AS monto_yape, 
+                   COALESCE(monto_credito, 0) AS monto_credito, 
+                   metodo_pago, boleta_url
+            FROM ventas
+            WHERE COALESCE(monto_credito, 0) > 0
+            ORDER BY id DESC
+        """)
+        df_pendientes = pd.read_sql(query_pendientes, engine)
+
+        if df_pendientes.empty:
+            st.success("🎉 ¡Excelente! No hay cuentas pendientes por cobrar (créditos en cero).")
+        else:
+            total_por_cobrar = df_pendientes["monto_credito"].sum()
+            st.metric(label="💰 Deuda Total Acumulada por Cobrar", value=f"S/ {total_por_cobrar:.2f}")
+            st.divider()
+
+            for _, row in df_pendientes.iterrows():
+                with st.container(border=True):
+                    cols = st.columns([1.2, 1.2, 1.5, 1.2, 1.2, 1.2, 1.2])
+                    
+                    estilo = "<div style='font-size: 13px; line-height: 1.3; overflow-wrap: break-word;'>"
+                    cierre = "</div>"
+
+                    with cols[0]:
+                        st.markdown(f"{estilo}<b>Fecha:</b><br>{row['fecha_hora']}{cierre}", unsafe_allow_html=True)
+                    with cols[1]:
+                        st.markdown(f"{estilo}<b>Comprobante:</b><br>{row['tipo_comprobante']}<br><b>N°:</b> {row['numero_comprobante'] or 'S/N'}{cierre}", unsafe_allow_html=True)
+                    with cols[2]:
+                        st.markdown(f"{estilo}<b>Método Pago:</b><br>{row['metodo_pago']}{cierre}", unsafe_allow_html=True)
+                    with cols[3]:
+                        st.markdown(f"{estilo}<b>Total Venta:</b><br>S/ {row['total']:.2f}{cierre}", unsafe_allow_html=True)
+                    with cols[4]:
+                        st.markdown(f"{estilo}<b>Abonado:</b><br>S/ {(row['monto_efectivo'] + row['monto_yape']):.2f}{cierre}", unsafe_allow_html=True)
+                    with cols[5]:
+                        st.markdown(f"{estilo}<b style='color: #DC2626;'>Pendiente:</b><br><span style='color: #DC2626; font-weight: bold;'>S/ {row['monto_credito']:.2f}</span>{cierre}", unsafe_allow_html=True)
+                    with cols[6]:
+                        url = str(row['boleta_url']).strip()
+                        if url and url not in ["", "None", "nan", "NaN", "null", "0"] and url.startswith("http"):
+                            st.markdown(f"{estilo}<b>Boleta:</b><br><a href='{url}' target='_blank'>Ver foto</a>{cierre}", unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"{estilo}<b>Boleta:</b><br><span style='color: #9CA3AF;'>No adjunta</span>{cierre}", unsafe_allow_html=True)
+
+    except Exception as e:
+        st.error(f"Error al cargar las ventas pendientes: {e}")
+
+# -------------------------------------------------------------
+# 5. REPORTE DIARIO DE VENTAS
 # -------------------------------------------------------------
 elif menu == "Reporte Diario de Ventas":
     st.header("📅 Reporte Diario y Control de Flujo de Dinero")
@@ -556,28 +648,8 @@ elif menu == "Reporte Diario de Ventas":
             conn.execute(text("""
                 DO $$ 
                 BEGIN 
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ventas' and column_name='monto_tarjeta') THEN
-                        ALTER TABLE ventas ADD COLUMN monto_tarjeta NUMERIC(10,2) DEFAULT 0;
-                    END IF;
-                END $$;
-            """))
-
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS gastos (
-                    id SERIAL PRIMARY KEY,
-                    fecha_hora TIMESTAMP,
-                    categoria VARCHAR(100),
-                    nota VARCHAR(255),
-                    metodo_pago VARCHAR(50) DEFAULT 'Efectivo',
-                    importe NUMERIC(10, 2)
-                )
-            """))
-            
-            conn.execute(text("""
-                DO $$ 
-                BEGIN 
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='gastos' and column_name='metodo_pago') THEN
-                        ALTER TABLE gastos ADD COLUMN metodo_pago VARCHAR(50) DEFAULT 'Efectivo';
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ventas' and column_name='monto_credito') THEN
+                        ALTER TABLE ventas ADD COLUMN monto_credito NUMERIC(10,2) DEFAULT 0;
                     END IF;
                 END $$;
             """))
@@ -586,7 +658,7 @@ elif menu == "Reporte Diario de Ventas":
             SELECT id, fecha_hora, total, metodo_pago, 
                    COALESCE(monto_efectivo, 0) AS monto_efectivo, 
                    COALESCE(monto_yape, 0) AS monto_yape, 
-                   COALESCE(monto_tarjeta, 0) AS monto_tarjeta, 
+                   COALESCE(monto_credito, 0) AS monto_credito, 
                    tipo_comprobante, numero_comprobante
             FROM ventas
             WHERE DATE(fecha_hora) = :f_sel
@@ -606,7 +678,7 @@ elif menu == "Reporte Diario de Ventas":
 
         ing_efectivo = df_dia["monto_efectivo"].sum() if not df_dia.empty else 0.0
         ing_yape = df_dia["monto_yape"].sum() if not df_dia.empty else 0.0
-        ing_tarjeta = df_dia["monto_tarjeta"].sum() if not df_dia.empty else 0.0
+        ing_credito = df_dia["monto_credito"].sum() if not df_dia.empty else 0.0
         total_ingresos = df_dia["total"].sum() if not df_dia.empty else 0.0
 
         st.subheader("💵 1. Ingresos por Ventas")
@@ -616,47 +688,42 @@ elif menu == "Reporte Diario de Ventas":
         with col_m2:
             st.metric(label="📱 Yape / Plin", value=f"S/ {ing_yape:.2f}")
         with col_m3:
-            st.metric(label="💳 Tarjeta", value=f"S/ {ing_tarjeta:.2f}")
+            st.metric(label="📋 Crédito (Por Cobrar)", value=f"S/ {ing_credito:.2f}")
         with col_m4:
-            st.metric(label="💰 Total Ingresos", value=f"S/ {total_ingresos:.2f}")
+            st.metric(label="💰 Total Ventas", value=f"S/ {total_ingresos:.2f}")
 
         if not df_gastos_dia.empty and "metodo_pago" in df_gastos_dia.columns:
             gasto_efectivo = df_gastos_dia[df_gastos_dia["metodo_pago"] == "Efectivo"]["importe"].sum()
             gasto_yape = df_gastos_dia[df_gastos_dia["metodo_pago"] == "Yape / Plin"]["importe"].sum()
-            gasto_tarjeta = df_gastos_dia[df_gastos_dia["metodo_pago"] == "Tarjeta"]["importe"].sum()
             total_gastos = df_gastos_dia["importe"].sum()
         else:
             gasto_efectivo = 0.0
             gasto_yape = 0.0
-            gasto_tarjeta = 0.0
             total_gastos = 0.0
 
         st.subheader("💸 2. Gastos Operativos")
-        col_g1, col_g2, col_g3, col_g4 = st.columns(4)
+        col_g1, col_g2, col_g3 = st.columns(3)
         with col_g1:
             st.metric(label="📤 Gastos en Efectivo", value=f"S/ {gasto_efectivo:.2f}")
         with col_g2:
             st.metric(label="📤 Gastos en Yape/Plin", value=f"S/ {gasto_yape:.2f}")
         with col_g3:
-            st.metric(label="📤 Gastos en Tarjeta", value=f"S/ {gasto_tarjeta:.2f}")
-        with col_g4:
             st.metric(label="📉 Total Gastos", value=f"S/ {total_gastos:.2f}")
 
         st.divider()
 
         neto_efectivo = ing_efectivo - gasto_efectivo
         neto_yape = ing_yape - gasto_yape
-        neto_tarjeta = ing_tarjeta - gasto_tarjeta
         balance_neto = total_ingresos - total_gastos
 
         st.subheader("🎯 3. Control de Flujo de Dinero (Cuánto debes tener disponible)")
         col_f1, col_f2, col_f3, col_f4 = st.columns(4)
         with col_f1:
-            st.metric(label="🪙 Efectivo en Caja", value=f"S/ {neto_efectivo:.2f}", delta=f"S/ {neto_efectivo:.2f}")
+            st.metric(label="🪙 Efectivo en Caja", value=f"S/ {neto_efectivo:.2f}")
         with col_f2:
-            st.metric(label="📱 Saldo Yape / Plin", value=f"S/ {neto_yape:.2f}", delta=f"S/ {neto_yape:.2f}")
+            st.metric(label="📱 Saldo Yape / Plin", value=f"S/ {neto_yape:.2f}")
         with col_f3:
-            st.metric(label="💳 Saldo Tarjeta", value=f"S/ {neto_tarjeta:.2f}", delta=f"S/ {neto_tarjeta:.2f}")
+            st.metric(label="📋 Crédito Pendiente", value=f"S/ {ing_credito:.2f}")
         with col_f4:
             st.metric(label="⚖ Balance Neto Total", value=f"S/ {balance_neto:.2f}")
 
@@ -685,7 +752,7 @@ elif menu == "Reporte Diario de Ventas":
         st.error(f"Error al cargar el reporte diario y balance: {e}")
 
 # -------------------------------------------------------------
-# 5. HISTORIAL DE VENTAS
+# 6. HISTORIAL DE VENTAS
 # -------------------------------------------------------------
 elif menu == "Historial de Ventas":
     st.header("📊 Historial de Ventas y Comprobantes")
@@ -787,7 +854,7 @@ elif menu == "Historial de Ventas":
                         st.markdown(f"{estilo}<b>Comprobante:</b><br><span style='color: #9CA3AF;'>No adjunto</span>{cierre}", unsafe_allow_html=True)
 
 # -------------------------------------------------------------
-# 6. REPOSICIÓN DE MERCADERÍA
+# 7. REPOSICIÓN DE MERCADERÍA
 # -------------------------------------------------------------
 elif menu == "Reposición de Mercadería":
     st.header("🔄 Reposición y Alerta de Stock Bajo")
@@ -845,7 +912,7 @@ elif menu == "Reposición de Mercadería":
                     st.error(f"Error al actualizar el stock: {e}")
 
 # -------------------------------------------------------------
-# 7. REGISTRAR PRODUCTO
+# 8. REGISTRAR PRODUCTO
 # -------------------------------------------------------------
 elif menu == "Registrar Modelo":
     st.header("➕ Registrar Nuevo Modelo")
@@ -918,7 +985,7 @@ elif menu == "Registrar Modelo":
                 st.warning("Completa al menos el código y el nombre.")
 
 # -------------------------------------------------------------
-# 8. ELIMINAR PRODUCTO
+# 9. ELIMINAR PRODUCTO
 # -------------------------------------------------------------
 elif menu == "Eliminar Modelo":
     st.header("🗑️ Eliminar Modelo")
