@@ -129,7 +129,6 @@ def subir_a_supabase(file_buffer, nombre_archivo, carpeta):
         return None
     try:
         path = f"{carpeta}/{nombre_archivo}"
-        # Usamos file_options con upsert para asegurar que se suba correctamente
         supabase.storage.from_("archivos-chanclas").upload(
             path, file_buffer.getvalue(), file_options={"content-type": "image/jpeg", "upsert": "true"}
         )
@@ -409,7 +408,7 @@ elif menu == "Registrar Venta (POS)":
                 if st.button("✅ Confirmar Venta"):
                     boleta_url = ""
                     if boleta_subida is not None:
-                        with st.spinner("Subiendo boleta..."):
+                        with st.spinner("Subiendo comprobante..."):
                             img_comp = comprimir_imagen(boleta_subida)
                             nombre_bol = f"boleta_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
                             boleta_url = subir_a_supabase(img_comp, nombre_bol, "boletas")
@@ -489,30 +488,30 @@ elif menu == "Historial de Ventas":
         df_hist["tipo_comprobante"] = df_hist["tipo_comprobante"].fillna("Nota de Venta")
         df_hist["numero_comprobante"] = df_hist["numero_comprobante"].fillna("S/N")
         
-        def formatear_enlace_boleta(url):
-            if pd.notna(url) and str(url).strip() not in ["", "None", "nan", "NaN", "null", "0"]:
-                return f"[Ver boleta]({url})"
-            return "No se adjunto comprobante"
-
-        df_hist["comprobante"] = df_hist["boleta_url"].apply(formatear_enlace_boleta)
-        
-        df_hist_display = df_hist[[
-            "tipo_comprobante", "numero_comprobante", "fecha_hora", "modelo", "talla", 
-            "docenas_vendidas", "precio_docena", "subtotal", "metodo_pago", "comprobante"
-        ]].copy()
-        
-        df_hist_display.columns = [
-            "Tipo", "N° Talonario", "Fecha y Hora", "Modelo", "Talla", 
-            "Docenas", "Precio x Doc. (S/)", "Subtotal (S/)", "Pago", "Foto"
-        ]
-        
-        st.dataframe(
-            df_hist_display, 
-            use_container_width=True,
-            column_config={
-                "Foto": st.column_config.LinkColumn("Foto", display_text="Ver boleta")
-            }
-        )
+        # Iteramos y mostramos cada venta en una tarjeta/fila personalizada para asegurar la correcta visualización del enlace o texto
+        for _, row in df_hist.iterrows():
+            with st.container(border=True):
+                col1, col2, col3, col4, col5, col6, col7 = st.columns([1, 1, 1.5, 1.5, 1, 1.2, 1.5])
+                
+                with col1:
+                    st.markdown(f"**Tipo:**<br>{row['tipo_comprobante']}", unsafe_allow_html=True)
+                with col2:
+                    st.markdown(f"**N°:**<br>{row['numero_comprobante']}", unsafe_allow_html=True)
+                with col3:
+                    st.markdown(f"**Fecha:**<br>{row['fecha_hora']}", unsafe_allow_html=True)
+                with col4:
+                    st.markdown(f"**Modelo / Talla:**<br>{row['modelo']} (T: {row['talla']})", unsafe_allow_html=True)
+                with col5:
+                    st.markdown(f"**Docenas:**<br>{row['docenas_vendidas']}", unsafe_allow_html=True)
+                with col6:
+                    st.markdown(f"**Subtotal:**<br>S/ {row['subtotal']:.2f}", unsafe_allow_html=True)
+                with col7:
+                    st.markdown("**Comprobante:**")
+                    url = str(row['boleta_url']).strip()
+                    if url and url not in ["", "None", "nan", "NaN", "null", "0"] and url.startswith("http"):
+                        st.markdown(f"[Ver comprobante]({url})")
+                    else:
+                        st.markdown("<span style='color: #6B7280; font-size: 13px;'>No se adjuntó comprobante</span>", unsafe_allow_html=True)
 
 # -------------------------------------------------------------
 # 5. REPOSICIÓN DE MERCADERÍA
