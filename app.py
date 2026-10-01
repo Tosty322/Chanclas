@@ -160,6 +160,7 @@ menu = st.sidebar.selectbox(
         "Registrar Modelo",
         "Registrar Venta (POS)",
         "Historial de Ventas",
+        "Registrar Gasto",
         "Reposición de Mercadería",
         "Eliminar Modelo",
     ],
@@ -540,17 +541,14 @@ elif menu == "Historial de Ventas":
         
         st.divider()
 
-        # Iteramos y generamos la fila de ventas aplicando un formato CSS pequeño y compacto en línea
         for _, row in df_hist.iterrows():
             with st.container(border=True):
-                # 11 columnas definidas para abarcar toda la fila, con pesos ajustados
                 cols = st.columns([0.8, 0.8, 1.1, 1.4, 0.6, 0.7, 0.6, 0.6, 0.8, 0.8, 1.1])
                 
                 doc_entera = int(row['docenas_enteras'])
                 und_suelta = int(row['unidades_sueltas'])
                 fraccion_doc = float(row['docenas_vendidas'])
                 
-                # Definimos el estilo HTML para hacer la letra más pequeña (12px)
                 estilo = "<div style='font-size: 12px; line-height: 1.2; overflow-wrap: break-word;'>"
                 cierre = "</div>"
 
@@ -582,7 +580,85 @@ elif menu == "Historial de Ventas":
                         st.markdown(f"{estilo}<b>Comprobante:</b><br><span style='color: #9CA3AF;'>No adjunto</span>{cierre}", unsafe_allow_html=True)
 
 # -------------------------------------------------------------
-# 5. REPOSICIÓN DE MERCADERÍA
+# 5. REGISTRAR GASTO (NUEVA SECCIÓN)
+# -------------------------------------------------------------
+elif menu == "Registrar Gasto":
+    st.header("💸 Registro de Gastos Operativos")
+    
+    with st.form("form_gastos"):
+        categoria_gasto = st.selectbox(
+            "Seleccione la categoría del gasto",
+            [
+                "comida y bebida",
+                "papel higiénico",
+                "jabón liquido",
+                "bolsas",
+                "nota de venta",
+                "sacos",
+                "plumón o lapiceros",
+                "gasto Estrella",
+                "gasto Estela",
+                "otros"
+            ]
+        )
+
+        nota_opcional = ""
+        if categoria_gasto == "otros":
+            nota_opcional = st.text_input("Nota opcional (Detalle de 'otros')")
+
+        importe_gasto = st.number_input("Importe del Gasto (S/)", min_value=0.0, format="%.2f", step=1.0)
+        
+        btn_guardar_gasto = st.form_submit_button("Guardar Gasto")
+
+        if btn_guardar_gasto:
+            try:
+                engine = conectar_db()
+                fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                
+                with engine.begin() as conn:
+                    # Crear tabla de gastos automáticamente si no existe
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS gastos (
+                            id SERIAL PRIMARY KEY,
+                            fecha_hora TIMESTAMP,
+                            categoria VARCHAR(100),
+                            nota VARCHAR(255),
+                            importe NUMERIC(10, 2)
+                        )
+                    """))
+                    
+                    conn.execute(
+                        text("""
+                            INSERT INTO gastos (fecha_hora, categoria, nota, importe)
+                            VALUES (:f_h, :cat, :not, :imp)
+                        """),
+                        dict(
+                            f_h=fecha_actual,
+                            cat=categoria_gasto,
+                            not=nota_opcional,
+                            imp=float(importe_gasto)
+                        )
+                    )
+                st.success(f"✅ Gasto de **S/ {importe_gasto:.2f}** en la categoría '{categoria_gasto}' registrado con éxito.")
+            except Exception as e:
+                st.error(f"Error al registrar el gasto: {e}")
+
+    # Mostrar historial reciente de gastos debajo
+    st.divider()
+    st.subheader("📋 Historial de Gastos Recientes")
+    try:
+        engine = conectar_db()
+        df_gastos = pd.read_sql(text("SELECT fecha_hora, categoria, nota, importe FROM gastos ORDER BY id DESC LIMIT 20"), engine)
+        if df_gastos.empty:
+            st.info("No hay gastos registrados todavía.")
+        else:
+            df_gastos.columns = ["Fecha y Hora", "Categoría", "Nota Opcional", "Importe (S/)"]
+            st.dataframe(df_gastos, use_container_width=True)
+    except Exception:
+        st.info("Aún no se ha creado la tabla de gastos en la base de datos (se creará al registrar el primer gasto).")
+
+# -------------------------------------------------------------
+# 6. REPOSICIÓN DE MERCADERÍA
 # -------------------------------------------------------------
 elif menu == "Reposición de Mercadería":
     st.header("🔄 Reposición y Alerta de Stock Bajo")
@@ -637,7 +713,7 @@ elif menu == "Reposición de Mercadería":
                     st.error(f"Error al actualizar el stock: {e}")
 
 # -------------------------------------------------------------
-# 6. ELIMINAR PRODUCTO
+# 7. ELIMINAR PRODUCTO
 # -------------------------------------------------------------
 elif menu == "Eliminar Modelo":
     st.header("🗑️ Eliminar Modelo")
@@ -659,7 +735,7 @@ elif menu == "Eliminar Modelo":
                         text("DELETE FROM productos WHERE id = :p_id"),
                         dict(p_id=int(id_borrar)),
                     )
-                st.success("Modelo eliminado correctamente.")
+                st.success("¡Modelo eliminado con éxito!")
                 st.rerun()
             except Exception as e:
-                st.error(f"No se puede eliminar porque tiene historial de ventas asociado: {e}")
+                st.error(f"Error al eliminar: {e}")
